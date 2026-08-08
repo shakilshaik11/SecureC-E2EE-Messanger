@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SecureC E2EE Messenger</title>
+
+  <!-- SEO Meta -->
+  <meta name="description"
+    content="SecureC E2EE Messenger is a zero-knowledge, end-to-end encrypted real-time messaging app. E2EE security, no server-stored messages, fully private.">
+  <meta name="keywords"
+    content="SecureC E2EE Messenger, secure chat, E2EE, encrypted messaging, private chat, WebSockets">
+  <meta name="author" content="SecureC Engineering">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://securec-messenger.onrender.com/">
+
+  <!-- Open Graph / Social Preview -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://securec-messenger.onrender.com/">
+  <meta property="og:title" content="SecureC E2EE Messenger">
+  <meta property="og:description"
+    content="Real-time, end-to-end encrypted messaging with SecureC E2EE Messenger. Zero messages stored on server. Complete privacy.">
+  <meta property="og:image" content="https://securec-messenger.onrender.com/logo.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="SecureC E2EE Messenger">
+  <meta name="twitter:description" content="Real-time encrypted messaging — zero server-side storage.">
+
+  <!-- Mobile / PWA -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SecureC E2EE Messenger">
+  <meta name="theme-color" content="#4f8ef7">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="shortcut icon" href="favicon.svg" type="image/svg+xml">
+
+  <!-- Preconnect to speed up font loading -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <!-- Premium Fonts: Plus Jakarta Sans (body) + Syne (headings) -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+  <!-- ═══ App Startup Splash / Loading Screen ═══ -->
+  <div id="app-loading-screen" class="loading-screen" role="status" aria-label="Loading SecureC E2EE Messenger">
+    <div class="loading-content">
+      <div class="logo-icon-wrapper loading-logo-icon-wrapper" aria-hidden="true">
+        <img src="logo.svg" alt="SecureC E2EE Messenger Logo" class="brand-logo-img">
+      </div>
+      <div class="brand-text text-center mt-2 mb-3">
+        <h1 class="loading-title">Secure<span>C</span></h1>
+        <p class="tagline">E2EE Real-Time Messenger</p>
+      </div>
+      <!-- From Uiverse.io by Nawsome -->
+      <div class="loader">
+        <div class="loader__bar"></div>
+        <div class="loader__bar"></div>
+        <div class="loader__bar"></div>
+        <div class="loader__bar"></div>
+        <div class="loader__bar"></div>
+        <div class="loader__ball"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Ambient Background Glass Blobs ═══ -->
+  <div class="glass-bg-decor decor-1" aria-hidden="true"></div>
+  <div class="glass-bg-decor decor-2" aria-hidden="true"></div>
+  <div class="glass-bg-decor decor-3" aria-hidden="true"></div>
+  <div class="glass-bg-decor decor-4" aria-hidden="true"></div>
+  <div class="glass-bg-decor decor-5" aria-hidden="true"></div>
+
+  <div class="app-wrapper" id="app-root">
+
+    <!-- ═══ Top Glass Navigation Header ═══ -->
+    <header class="app-header glass-panel" role="banner">
+      <a class="brand-logo" href="/" aria-label="SecureC E2EE Messenger home">
+        <div class="logo-icon-wrapper" aria-hidden="true">
+          <img src="logo.svg" alt="SecureC E2EE Messenger Logo" class="brand-logo-img">
+        </div>
+        <div class="brand-text">
+          <h1>Secure<span>C</span></h1>
+          <p class="tagline">E2EE Real-Time Messenger</p>
+        </div>
+      </a>
+
+      <div class="header-right-group">
+        <label class="switch" title="Toggle Light / Dark Theme" aria-label="Toggle theme switch">
+          <input type="checkbox" class="theme-switch-input" aria-label="Toggle dark or light mode" />
+          <span class="slider">
+            <div class="star star_1"></div>
+            <div class="star star_2"></div>
+            <div class="star star_3"></div>
+            <svg viewBox="0 0 16 16" class="cloud_1 cloud">
+              <path transform="matrix(.77976 0 0 .78395-299.99-418.63)" fill="#fff"
+                d="m391.84 540.91c-.421-.329-.949-.524-1.523-.524-1.351 0-2.451 1.084-2.485 2.435-1.395.526-2.388 1.88-2.388 3.466 0 1.874 1.385 3.423 3.182 3.667v.034h12.73v-.006c1.775-.104 3.182-1.584 3.182-3.395 0-1.747-1.309-3.186-2.994-3.379.007-.106.011-.214.011-.322 0-2.707-2.271-4.901-5.072-4.901-2.073 0-3.856 1.202-4.643 2.925">
+              </path>
+            </svg>
+          </span>
+        </label>
+        <div id="header-user-actions" class="header-user-actions">
+          <button id="btn-open-profile" class="btn-icon-glass flex-btn" title="My Personal Profile"
+            aria-label="Open profile">
+            <span id="header-avatar" class="header-user-avatar" aria-hidden="true">🧑‍💻</span>
+            <span id="header-username" class="header-user-name">User</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content" role="main">
+
+      <!-- ═══ STEP 0.5: SECURE AUTHENTICATION (disabled by default) ═══ -->
+      <section id="step-auth" class="step-card glass-panel fade-in hidden" aria-label="Authentication">
+        <div class="step-header text-center">
+          <div class="step-badge"><i class="fa-solid fa-shield-halved text-success" aria-hidden="true"></i> Security
+            Access Portal</div>
+          <h2 id="auth-card-title">Sign In to SecureC</h2>
+          <p id="auth-card-desc">Access your private &amp; encrypted messaging portal.</p>
+        </div>
+      </section>
+
+      <!-- ═══ STEP 1: USER PROFILE SETUP ═══ -->
+      <section id="step-profile" class="step-card glass-panel fade-in" aria-label="Profile setup">
+        <div class="step-header text-center">
+          <div class="step-badge">Step 1 of 2</div>
+          <h2>Create Your Identity</h2>
+          <p>Choose your display avatar and nickname to start instant encrypted messaging.</p>
+        </div>
+
+        <div class="avatar-picker-container">
+          <label class="input-label" id="avatar-picker-label">Select Your Avatar</label>
+          <div class="avatar-grid" id="avatar-options" role="radiogroup" aria-labelledby="avatar-picker-label">
+            <button type="button" class="avatar-option selected" data-avatar="🧑‍💻" aria-label="Developer avatar"
+              aria-pressed="true">🧑‍💻</button>
+            <button type="button" class="avatar-option" data-avatar="⚡" aria-label="Lightning avatar"
+              aria-pressed="false">⚡</button>
+            <button type="button" class="avatar-option" data-avatar="🔐" aria-label="Lock avatar"
+              aria-pressed="false">🔐</button>
+            <button type="button" class="avatar-option" data-avatar="🚀" aria-label="Rocket avatar"
+              aria-pressed="false">🚀</button>
+            <button type="button" class="avatar-option" data-avatar="🛡️" aria-label="Shield avatar"
+              aria-pressed="false">🛡️</button>
+            <button type="button" class="avatar-option" data-avatar="🎭" aria-label="Theater avatar"
+              aria-pressed="false">🎭</button>
+            <button type="button" class="avatar-option" data-avatar="💎" aria-label="Diamond avatar"
+              aria-pressed="false">💎</button>
+            <button type="button" class="avatar-option" data-avatar="👑" aria-label="Crown avatar"
+              aria-pressed="false">👑</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="username-input" class="input-label">Your Name or Alias <span
+              style="color: #f43f5e;">*</span></label>
+          <div class="input-with-icon">
+            <i class="fa-regular fa-user" aria-hidden="true"></i>
+            <input type="text" id="username-input" class="glass-input" placeholder="Enter your name (Required)"
+              maxlength="30" required autocomplete="off" autocorrect="off" spellcheck="false">
+          </div>
+          <p id="username-error-msg" class="text-danger small mt-1 hidden"
+            style="font-size: 0.82rem; font-weight: 600; color: #f43f5e; margin-top: 6px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-circle-exclamation"></i> Please enter your name to continue.
+          </p>
+        </div>
+
+        <button id="btn-save-profile" class="btn btn-primary btn-block">
+          <span>Continue to Portal</span>
+          <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+        </button>
+      </section>
+
+      <!-- ═══ STEP 2: ROOM PORTAL ═══ -->
+      <section id="step-portal" class="step-card glass-panel fade-in hidden" aria-label="Room portal">
+        <div class="portal-header text-center">
+          <div class="user-greeting">
+            <span id="portal-user-avatar" class="greeting-avatar" aria-hidden="true">🧑‍💻</span>
+            <div>
+              <h3>Welcome, <span id="portal-username">User</span>!</h3>
+              <p class="sub-text">Create a new secure room or join a friend using a code.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="portal-grid">
+          <!-- CREATE ROOM CARD -->
+          <div class="portal-option-card glass-panel-inner">
+            <div class="option-icon bg-light-primary">
+              <i class="fa-solid fa-plus-circle" aria-hidden="true"></i>
+            </div>
+            <h4>Create New Room</h4>
+            <p>Generate a unique 6-character room code and invite a friend to join your encrypted session.</p>
+
+            <button id="btn-create-room" class="btn btn-emerald btn-block mt-auto" aria-label="Create encrypted room">
+              <i class="fa-solid fa-key" aria-hidden="true"></i>
+              <span>Create Room Code</span>
+            </button>
+
+            <!-- Created Room Code Display Box -->
+            <div id="created-code-box" class="code-box hidden" role="region" aria-label="Your room code">
+              <span class="code-label">YOUR UNIQUE ROOM CODE</span>
+              <div class="code-value-wrapper">
+                <span id="generated-room-code" class="code-display" aria-live="polite">------</span>
+                <button id="btn-copy-code" class="btn-icon-glass" title="Copy Code" aria-label="Copy room code">
+                  <i class="fa-regular fa-copy" aria-hidden="true"></i>
+                </button>
+              </div>
+              <div class="share-link-wrapper">
+                <input type="text" id="share-link-input" class="glass-input-sm" readonly aria-label="Shareable link">
+                <button id="btn-copy-link" class="btn btn-sm btn-outline">Copy Link</button>
+              </div>
+              <div class="waiting-indicator" role="status">
+                <div class="spinner-sm" aria-hidden="true"></div>
+                <span>Waiting for friend to enter code…</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- JOIN ROOM CARD -->
+          <div class="portal-option-card glass-panel-inner">
+            <div class="option-icon bg-light-accent">
+              <i class="fa-solid fa-door-open" aria-hidden="true"></i>
+            </div>
+            <h4>Join Existing Room</h4>
+            <p>Enter the 6-character room code provided by the room creator.</p>
+
+            <div class="form-group mt-auto">
+              <label for="join-code-input" class="input-label">Enter 6-Digit Code</label>
+              <div class="input-with-icon">
+                <i class="fa-solid fa-hashtag" aria-hidden="true"></i>
+                <input type="text" id="join-code-input" class="glass-input code-input" placeholder="e.g. XY9K2M"
+                  maxlength="6" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Room join code">
+              </div>
+            </div>
+
+            <button id="btn-join-room" class="btn btn-primary btn-block" aria-label="Join encrypted room">
+              <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
+              <span>Join Room</span>
+            </button>
+          </div>
+
+          <!-- PERSISTENT PERSONAL ROOM CARD -->
+          <div class="portal-option-card glass-panel-inner" style="grid-column: 1 / -1; margin-top: 10px;">
+            <div style="display:flex; align-items:center; gap:12px;" class="mb-2">
+              <div class="option-icon"
+                style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);color:#059669;width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+                <i class="fa-solid fa-vault" aria-hidden="true"></i>
+              </div>
+              <div>
+                <h4 style="margin:0;font-size:1.05rem;">Personal Saved Room (Persistent E2EE)</h4>
+                <p style="margin:0;font-size:0.8rem;opacity:0.8;">Set a custom key (e.g. <code>987654</code> or
+                  <code>SecretVault</code>). Re-enter anytime with your key to view saved chat history.
+                </p>
+              </div>
+            </div>
+
+            <div class="form-group mt-2">
+              <label for="persistent-key-input" class="input-label">Enter Custom Key or Passcode</label>
+              <div class="input-with-icon">
+                <i class="fa-solid fa-key" aria-hidden="true"></i>
+                <input type="text" id="persistent-key-input" class="glass-input"
+                  placeholder="e.g. SecretVault or 987654" maxlength="30" autocomplete="off" autocorrect="off"
+                  spellcheck="false" aria-label="Persistent room key">
+              </div>
+            </div>
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap;" class="mt-2">
+              <button id="btn-open-persistent-room" class="btn btn-emerald" style="flex:1; min-width:180px;"
+                aria-label="Create or open persistent room">
+                <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                <span>Open / Create Personal Room</span>
+              </button>
+              <button id="btn-join-persistent-room" class="btn btn-primary" style="flex:1; min-width:180px;"
+                aria-label="Join persistent room">
+                <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
+                <span>Join Personal Room</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ STEP 3: E2EE CHAT ═══ -->
+      <section id="step-chat" class="chat-container glass-panel fade-in hidden" aria-label="Encrypted chat room">
+
+        <!-- Chat Glass Header -->
+        <div class="chat-header" role="banner">
+          <div class="peer-profile">
+            <div class="peer-avatar-wrapper">
+              <span id="chat-peer-avatar" class="peer-avatar" aria-hidden="true">⚡</span>
+              <span id="peer-status-dot" class="status-dot offline" role="status" aria-label="Offline"></span>
+            </div>
+            <div class="peer-info">
+              <h4 id="chat-peer-name">Waiting for participant…</h4>
+              <p id="chat-peer-status" class="peer-status-text">Encrypted Connection Establishing…</p>
+            </div>
+          </div>
+
+          <div class="header-actions">
+            <label class="switch theme-switch-chat" title="Toggle Light / Dark Theme"
+              aria-label="Toggle theme switch in chat">
+              <input type="checkbox" class="theme-switch-input" aria-label="Toggle dark or light mode" />
+              <span class="slider">
+                <div class="star star_1"></div>
+                <div class="star star_2"></div>
+                <div class="star star_3"></div>
+                <svg viewBox="0 0 16 16" class="cloud_1 cloud">
+                  <path transform="matrix(.77976 0 0 .78395-299.99-418.63)" fill="#fff"
+                    d="m391.84 540.91c-.421-.329-.949-.524-1.523-.524-1.351 0-2.451 1.084-2.485 2.435-1.395.526-2.388 1.88-2.388 3.466 0 1.874 1.385 3.423 3.182 3.667v.034h12.73v-.006c1.775-.104 3.182-1.584 3.182-3.395 0-1.747-1.309-3.186-2.994-3.379.007-.106.011-.214.011-.322 0-2.707-2.271-4.901-5.072-4.901-2.073 0-3.856 1.202-4.643 2.925">
+                  </path>
+                </svg>
+              </span>
+            </label>
+            <button id="btn-toggle-search" class="btn-icon-glass" title="Search Messages" aria-label="Search messages">
+              <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            </button>
+            <div class="room-code-badge glass-pill" title="Room Code" role="note" aria-label="Room code">
+              <i class="fa-solid fa-hashtag" aria-hidden="true"></i>
+              <span id="chat-room-code-text">------</span>
+              <button id="btn-copy-chat-code" class="btn-icon-link" title="Copy Code" aria-label="Copy chat room code">
+                <i class="fa-regular fa-copy" aria-hidden="true"></i>
+              </button>
+            </div>
+            <button id="btn-leave-room" class="btn-icon-glass btn-danger-icon" title="Leave Room"
+              aria-label="Leave room">
+              <i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div id="search-bar-container" class="search-bar-box hidden" role="search">
+          <div class="input-with-icon w-100">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="text" id="chat-search-input" class="glass-input-sm"
+              placeholder="Search decrypted messages in chat…" aria-label="Search messages">
+          </div>
+          <button id="btn-close-search" class="btn-icon-glass" aria-label="Close search">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <!-- Pinned Message Header Bar -->
+        <div id="pinned-message-bar" class="pinned-message-bar hidden" role="note" aria-label="Pinned message">
+          <div class="pinned-content">
+            <i class="fa-solid fa-thumbtack text-warning" aria-hidden="true"></i>
+            <div class="pinned-text-wrapper">
+              <span class="pinned-title">Pinned Message</span>
+              <span id="pinned-message-text" class="pinned-snippet">Message content…</span>
+            </div>
+          </div>
+          <button id="btn-unpin-message" class="btn-icon-glass" title="Unpin Message" aria-label="Unpin message">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <!-- Security Notice Banner -->
+        <div class="security-notice-bar" role="note">
+          <i class="fa-solid fa-lock" aria-hidden="true"></i>
+          <span>Encrypted &amp; Private · No message history stored</span>
+        </div>
+
+        <!-- Chat Feed Area -->
+        <div class="chat-feed" id="chat-feed" role="log" aria-live="polite" aria-label="Chat messages">
+          <div class="system-message">
+            <div class="system-pill">
+              <i class="fa-solid fa-lock" aria-hidden="true"></i>
+              <span>Room created. All messages and attachments are private &amp; encrypted.</span>
+            </div>
+          </div>
+          <!-- Messages dynamically appended here -->
+        </div>
+
+        <!-- Peer Typing Indicator -->
+        <div id="typing-indicator" class="typing-bar hidden" role="status" aria-live="polite">
+          <span id="typing-username">Participant</span> is typing
+          <span class="typing-dots" aria-hidden="true">
+            <span>.</span><span>.</span><span>.</span>
+          </span>
+        </div>
+
+        <!-- Replying To Preview Bar -->
+        <div id="reply-preview-bar" class="reply-preview-box hidden" role="note" aria-label="Replying to">
+          <div class="reply-preview-content">
+            <i class="fa-solid fa-reply text-primary" aria-hidden="true"></i>
+            <div class="reply-text-wrapper">
+              <span id="reply-sender-name" class="reply-sender">Replying to user</span>
+              <span id="reply-snippet-text" class="reply-snippet">Original message content…</span>
+            </div>
+          </div>
+          <button id="btn-cancel-reply" class="btn-icon-glass" title="Cancel Reply" aria-label="Cancel reply">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <!-- Editing Message Preview Bar -->
+        <div id="edit-preview-bar" class="edit-preview-box hidden" role="note" aria-label="Editing message">
+          <div class="edit-preview-content">
+            <i class="fa-solid fa-pen-to-square text-primary" aria-hidden="true"></i>
+            <div class="edit-text-wrapper">
+              <span class="edit-title">Editing Message <span style="font-weight:500;opacity:0.75;">(Within 15
+                  mins)</span></span>
+              <span id="edit-snippet-text" class="edit-snippet">Current message text…</span>
+            </div>
+          </div>
+          <button id="btn-cancel-edit" class="btn-icon-glass" title="Cancel Edit" aria-label="Cancel edit">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <!-- Selected Attachment Preview Box -->
+        <div id="attachment-preview" class="attachment-preview-box hidden" role="note" aria-label="Attachment selected">
+          <div class="preview-info">
+            <i class="fa-solid fa-paperclip text-primary" aria-hidden="true"></i>
+            <span id="attachment-filename">filename.png</span>
+            <span id="attachment-size" class="text-muted">(1.2 MB)</span>
+          </div>
+          <button id="btn-cancel-attachment" class="btn-icon-glass" aria-label="Remove attachment">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <!-- Voice Recording Interface Bar -->
+        <div id="voice-recording-bar" class="voice-recording-overlay hidden" role="status" aria-live="assertive">
+          <button id="btn-cancel-voice" class="wa-mic-action-btn btn-trash" title="Discard Voice Note"
+            aria-label="Discard voice note">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+          <div class="wa-rec-indicator">
+            <div class="rec-dot-pulsing"></div>
+            <span id="voice-timer" class="wa-rec-timer">00:00</span>
+          </div>
+          <div class="wa-rec-waveform-anim">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+          </div>
+          <button id="btn-send-voice" class="wa-mic-action-btn btn-send-record" title="Send Voice Note"
+            aria-label="Send voice note">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+
+        <!-- Chat Input Footer -->
+        <div class="chat-input-bar" role="form" aria-label="Send message">
+          <!-- File / Media Input (Hidden) -->
+          <input type="file" id="file-input" class="hidden" aria-label="Attach file">
+
+          <button id="btn-attach" class="btn-icon-glass" title="Attach File / Image" aria-label="Attach file or image">
+            <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
+          </button>
+
+          <button id="btn-record-voice" class="btn-icon-glass" title="Click to Record Voice Note"
+            aria-label="Record voice note">
+            <i class="fa-solid fa-microphone" aria-hidden="true"></i>
+          </button>
+
+          <div class="input-wrapper">
+            <textarea id="message-input" class="chat-textarea" placeholder="Type a message…" rows="1" autocomplete="off"
+              autocorrect="off" spellcheck="true" aria-label="Message input" aria-multiline="true"></textarea>
+          </div>
+
+          <button id="btn-send-message" class="btn btn-send" title="Send Message" aria-label="Send message">
+            <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+          </button>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- App Footer -->
+    <footer class="app-footer" role="contentinfo">
+      <p>SecureC &nbsp;·&nbsp; E2EE Real-Time Messenger &nbsp;·&nbsp; <span style="opacity:0.65;">Zero server-side
+          storage</span></p>
+    </footer>
+
+  </div>
+
+  <!-- ═══ Microphone Permission Help Modal ═══ -->
+  <div id="mic-permission-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="mic-modal-title">
+    <div class="modal-content glass-panel-inner" style="max-width:440px;">
+      <div class="modal-header">
+        <h3 id="mic-modal-title"><i class="fa-solid fa-microphone text-primary" aria-hidden="true"></i> Microphone
+          Access Needed</h3>
+        <button id="btn-close-mic-modal" class="btn-icon-glass" aria-label="Close dialog">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="modal-body text-center">
+        <div class="mb-3" style="font-size:2.8rem; line-height:1;">
+          <i class="fa-solid fa-microphone-slash"
+            style="background:linear-gradient(135deg,#f43f5e,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;"
+            aria-hidden="true"></i>
+        </div>
+        <p class="mb-3">To record and send encrypted voice notes, SecureC needs access to your microphone.</p>
+
+        <div class="profile-data-card glass-panel-inner text-left mb-3"
+          style="font-size:0.84rem;display:flex;flex-direction:column;gap:10px;text-align:left;">
+          <div><strong>1.</strong> Click the lock 🔒 icon in your browser's address bar.</div>
+          <div><strong>2.</strong> Change <em>Microphone</em> permission to <strong>"Allow"</strong>.</div>
+          <div><strong>3.</strong> Click <strong>"Try Again"</strong> below.</div>
+        </div>
+
+        <button id="btn-retry-mic-permission" class="btn btn-primary btn-block">
+          <i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Try Again &amp; Grant Access
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Personal User Profile Modal ═══ -->
+  <div id="profile-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+    <div class="modal-content glass-panel-inner">
+      <div class="modal-header">
+        <h3 id="profile-modal-title"><i class="fa-solid fa-user-gear text-primary" aria-hidden="true"></i> My Profile
+        </h3>
+        <button id="btn-close-profile-modal" class="btn-icon-glass" aria-label="Close profile">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+
+        <div class="profile-photo-section text-center mb-3">
+          <div class="profile-photo-container mb-2">
+            <span id="profile-modal-avatar" class="greeting-avatar" aria-hidden="true">🧑‍💻</span>
+          </div>
+
+          <p class="small text-muted mb-2">Select your avatar emoji</p>
+          <div class="avatar-grid" id="profile-avatar-options" role="radiogroup" aria-label="Avatar selector"
+            style="max-width:280px;margin:0 auto;">
+            <button type="button" class="avatar-option selected" data-avatar="🧑‍💻" aria-pressed="true">🧑‍💻</button>
+            <button type="button" class="avatar-option" data-avatar="⚡" aria-pressed="false">⚡</button>
+            <button type="button" class="avatar-option" data-avatar="🔐" aria-pressed="false">🔐</button>
+            <button type="button" class="avatar-option" data-avatar="🚀" aria-pressed="false">🚀</button>
+            <button type="button" class="avatar-option" data-avatar="🛡️" aria-pressed="false">🛡️</button>
+            <button type="button" class="avatar-option" data-avatar="🎭" aria-pressed="false">🎭</button>
+            <button type="button" class="avatar-option" data-avatar="💎" aria-pressed="false">💎</button>
+            <button type="button" class="avatar-option" data-avatar="👑" aria-pressed="false">👑</button>
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label for="profile-name-input" class="input-label">Display Name / Alias</label>
+          <div class="input-with-icon">
+            <i class="fa-regular fa-user" aria-hidden="true"></i>
+            <input type="text" id="profile-name-input" class="glass-input" placeholder="Enter your name" maxlength="30"
+              required>
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label for="profile-bio-input" class="input-label">Bio / About</label>
+          <div class="input-with-icon">
+            <i class="fa-regular fa-comment-dots" aria-hidden="true"></i>
+            <input type="text" id="profile-bio-input" class="glass-input" placeholder="Hey there! I am using SecureC."
+              maxlength="100">
+          </div>
+        </div>
+
+        <div class="profile-data-card glass-panel-inner mb-3">
+          <div class="data-field">
+            <span class="data-label"><i class="fa-solid fa-calendar-day" aria-hidden="true"></i> Account Created</span>
+            <span id="profile-created-date" class="data-value">Jul 31, 2026</span>
+          </div>
+          <div class="data-field">
+            <span class="data-label"><i class="fa-solid fa-user-tag" aria-hidden="true"></i> User ID (UID)</span>
+            <span id="profile-uid-text" class="data-value code-font">user_12345678</span>
+          </div>
+        </div>
+
+        <div class="profile-actions-group">
+          <button id="btn-save-modal-profile" class="btn btn-primary btn-block">
+            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save Profile Changes
+          </button>
+          <button id="btn-modal-logout" class="btn-outline-danger mt-2">
+            <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Sign Out of Account
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase JS SDK (Compat mode) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <!-- Firebase Config -->
+  <script src="js/firebase-config.js?v=2.0.0"></script>
+  <!-- E2EE Cryptographic Engine -->
+  <script src="js/crypto.js?v=2.0.0"></script>
+  <!-- Application Logic -->
+  <script src="js/app.js?v=2.0.0"></script>
+
+</body>
+
+</html>

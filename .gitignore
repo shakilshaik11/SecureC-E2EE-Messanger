@@ -1,0 +1,13 @@
+# Node dependencies
+node_modules/
+
+# Compiled output
+dist/
+
+# Environment variables
+.env
+
+# Logs & OS artifacts
+*.log
+.DS_Store
+Thumbs.db
