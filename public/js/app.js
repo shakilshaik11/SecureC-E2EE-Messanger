@@ -2508,24 +2508,30 @@ document.addEventListener('DOMContentLoaded', () => {
       bodyHtml = `
         <div style="position:relative; display:inline-block; max-width:100%;">
           <img src="${content}" alt="Attachment" class="message-media-img">
-          <button type="button" onclick="downloadAttachment('${id}')" class="btn-icon-glass download-icon-btn" title="Download Photo" aria-label="Download Photo" style="position:absolute; bottom:10px; right:10px; background:rgba(0,0,0,0.65); color:#fff; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center;">
-            <i class="fa-solid fa-download"></i>
-          </button>
+          <div style="position:absolute; bottom:10px; right:10px;">
+            <button type="button" onclick="downloadAttachment('${id}')" class="Btn" title="Download Image">
+              <svg class="svgIcon" viewBox="0 0 384 512" height="1em" xmlns="http://www.w3.org/2000/svg"><path d="M169.4 470.6c12.5 12.5 32.8 12.5 45.3 0l160-160c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 370.8 224 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 306.7L54.6 265.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l160 160z"></path></svg>
+              <span class="icon2"></span>
+              <span class="tooltip">Download</span>
+            </button>
+          </div>
         </div>`;
     } else if (mediaType === 'file') {
       bodyHtml = `
-        <div class="file-attachment-card" style="display:flex; align-items:center; justify-space-between; gap:12px; padding:10px 14px; background:rgba(255,255,255,0.06); border-radius:12px; border:1px solid rgba(255,255,255,0.12);">
-          <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
-            <div style="width:38px; height:38px; border-radius:10px; background:rgba(99,102,241,0.15); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0;">
+        <div class="file-attachment-card" style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 16px; background:rgba(255,255,255,0.06); border-radius:14px; border:1px solid rgba(255,255,255,0.12);">
+          <div style="display:flex; align-items:center; gap:12px; overflow:hidden;">
+            <div style="width:42px; height:42px; border-radius:12px; background:rgba(99,102,241,0.18); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">
               <i class="fa-solid fa-file-lines"></i>
             </div>
             <div style="min-width:0;">
-              <div style="font-weight:600; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(fileName || 'Attachment')}</div>
-              <div class="text-muted" style="font-size:0.75rem;">${fileSize || 'Document'}</div>
+              <div style="font-weight:600; font-size:0.92rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(fileName || 'Attachment')}</div>
+              <div class="text-muted" style="font-size:0.78rem;">${fileSize || 'Document'}</div>
             </div>
           </div>
-          <button type="button" onclick="downloadAttachment('${id}')" class="btn-icon-glass" title="Download Document" aria-label="Download Document" style="flex-shrink:0; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--primary); color:#fff;">
-            <i class="fa-solid fa-download"></i>
+          <button type="button" onclick="downloadAttachment('${id}')" class="Btn" title="Download File" aria-label="Download File">
+            <svg class="svgIcon" viewBox="0 0 384 512" height="1em" xmlns="http://www.w3.org/2000/svg"><path d="M169.4 470.6c12.5 12.5 32.8 12.5 45.3 0l160-160c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 370.8 224 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 306.7L54.6 265.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l160 160z"></path></svg>
+            <span class="icon2"></span>
+            <span class="tooltip">Download</span>
           </button>
         </div>`;
     } else if (mediaType === 'voice') {
