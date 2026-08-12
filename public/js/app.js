@@ -678,9 +678,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const keyToDerive = currentVaultPassphrase || localStorage.getItem('securec_vault_passphrase_' + roomCode) || roomCode;
         await window.e2ee.deriveKeyFromPassphrase(keyToDerive);
         isE2EEActive = true;
-        if (chatPeerStatus) {
-          chatPeerStatus.textContent = '🔒 Persistent E2EE Room';
-          chatPeerStatus.classList.add('text-success');
+        
+        if (roomCode.startsWith('MYDATA_')) {
+          if (chatPeerAvatar) chatPeerAvatar.textContent = '☁️';
+          if (chatPeerName) chatPeerName.textContent = 'MyData Vault';
+          if (chatPeerStatus) {
+            chatPeerStatus.textContent = '🔒 Personal E2EE Cloud Vault';
+            chatPeerStatus.classList.add('text-success');
+          }
+          if (peerStatusDot) peerStatusDot.className = 'status-dot online';
+        } else {
+          if (chatPeerAvatar) chatPeerAvatar.textContent = '🔐';
+          if (chatPeerName) chatPeerName.textContent = 'Personal Room';
+          if (chatPeerStatus) {
+            chatPeerStatus.textContent = '🔒 Persistent E2EE Session Active';
+            chatPeerStatus.classList.add('text-success');
+          }
+          if (peerStatusDot) peerStatusDot.className = 'status-dot online';
         }
       }
 
