@@ -2355,7 +2355,51 @@ document.addEventListener('DOMContentLoaded', () => {
   // UI FEED & UTILITY HELPERS
   // =========================================================================
 
-  // Programmatic File Download Helper (Prevents Chrome "File can't be downloaded securely" Blob warning)
+  function fixFileNameAndMime(rawName, rawMime, bytes) {
+    let name = rawName || 'document';
+    let mime = rawMime || 'application/octet-stream';
+
+    // Magic Bytes Detection for PDF (%PDF -> 0x25, 0x50, 0x44, 0x46)
+    if (bytes && bytes.length >= 4) {
+      if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+        mime = 'application/pdf';
+        if (!name.toLowerCase().endsWith('.pdf')) {
+          name = name.replace(/\.[^/.]+$/, '') + '.pdf';
+        }
+      }
+      // PNG (0x89, 0x50, 0x4E, 0x47)
+      else if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+        mime = 'image/png';
+        if (!name.toLowerCase().endsWith('.png')) {
+          name = name.replace(/\.[^/.]+$/, '') + '.png';
+        }
+      }
+      // JPEG (0xFF, 0xD8, 0xFF)
+      else if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+        mime = 'image/jpeg';
+        if (!name.toLowerCase().endsWith('.jpg') && !name.toLowerCase().endsWith('.jpeg')) {
+          name = name.replace(/\.[^/.]+$/, '') + '.jpg';
+        }
+      }
+      // ZIP / DOCX / XLSX / PPTX (0x50, 0x4B, 0x03, 0x04)
+      else if (bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04) {
+        if (!name.includes('.')) name = name + '.docx';
+      }
+    }
+
+    if (!name.includes('.')) {
+      if (mime.includes('pdf')) name += '.pdf';
+      else if (mime.includes('png')) name += '.png';
+      else if (mime.includes('jpeg') || mime.includes('jpg')) name += '.jpg';
+      else if (mime.includes('word') || mime.includes('docx')) name += '.docx';
+      else if (mime.includes('excel') || mime.includes('xlsx')) name += '.xlsx';
+      else if (mime.includes('zip')) name += '.zip';
+    }
+
+    return { name, mime };
+  }
+
+  // Programmatic File Download Helper (Prevents Chrome "File can't be downloaded securely" Blob warning & preserves PDF format)
   window.downloadAttachment = function (id) {
     const msg = messageStore.get(id);
     if (!msg || !msg.content) {
@@ -2363,54 +2407,63 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const fileName = msg.fileName || 'securec_file';
     const content = msg.content;
+    let rawName = msg.fileName || 'download';
+    let rawMime = 'application/octet-stream';
 
     try {
       if (typeof content === 'string' && content.startsWith('data:')) {
         const parts = content.split(';base64,');
-        const mime = parts[0].replace('data:', '') || 'application/octet-stream';
+        rawMime = parts[0].replace('data:', '') || 'application/octet-stream';
         const binaryStr = window.atob(parts[1]);
         const bytes = new Uint8Array(binaryStr.length);
         for (let i = 0; i < binaryStr.length; i++) {
           bytes[i] = binaryStr.charCodeAt(i);
         }
+
+        const { name, mime } = fixFileNameAndMime(rawName, rawMime, bytes);
         const blob = new Blob([bytes], { type: mime });
         const blobUrl = URL.createObjectURL(blob);
 
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = blobUrl;
-        a.download = fileName;
+        a.download = name;
         document.body.appendChild(a);
         a.click();
         setTimeout(() => {
           document.body.removeChild(a);
           URL.revokeObjectURL(blobUrl);
         }, 1000);
+        showToast(`📥 Downloading ${name}...`);
       } else if (typeof content === 'string' && content.startsWith('blob:')) {
+        const { name } = fixFileNameAndMime(rawName, rawMime, null);
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = content;
-        a.download = fileName;
+        a.download = name;
         document.body.appendChild(a);
         a.click();
         setTimeout(() => document.body.removeChild(a), 1000);
+        showToast(`📥 Downloading ${name}...`);
       } else {
-        const blob = new Blob([content], { type: 'application/octet-stream' });
+        const bytes = content instanceof Uint8Array ? content : new Uint8Array(content);
+        const { name, mime } = fixFileNameAndMime(rawName, rawMime, bytes);
+        const blob = new Blob([bytes], { type: mime });
         const blobUrl = URL.createObjectURL(blob);
+
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = blobUrl;
-        a.download = fileName;
+        a.download = name;
         document.body.appendChild(a);
         a.click();
         setTimeout(() => {
           document.body.removeChild(a);
           URL.revokeObjectURL(blobUrl);
         }, 1000);
+        showToast(`📥 Downloading ${name}...`);
       }
-      showToast(`📥 Downloading ${fileName}...`);
     } catch (e) {
       console.error('Download error:', e);
       showToast('⚠️ Download failed. Please try again.');
