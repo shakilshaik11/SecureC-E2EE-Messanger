@@ -2418,7 +2418,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return { name, mime };
   }
 
-  // Programmatic File Download Helper (Prevents Chrome "File can't be downloaded securely" Blob warning & preserves PDF format)
+  // Programmatic File Download Helper (Preserves PDF MIME & file extension for Android WPS PDF Reader)
   window.downloadAttachment = function (id) {
     const msg = messageStore.get(id);
     if (!msg || !msg.content) {
@@ -2427,11 +2427,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const content = msg.content;
-    let rawName = msg.fileName || 'download';
+    let rawName = msg.fileName || 'document';
     let rawMime = 'application/octet-stream';
 
     try {
+      let dataUrl = '';
       if (typeof content === 'string' && content.startsWith('data:')) {
+        dataUrl = content;
         const parts = content.split(';base64,');
         rawMime = parts[0].replace('data:', '') || 'application/octet-stream';
         const binaryStr = window.atob(parts[1]);
@@ -2441,48 +2443,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const { name, mime } = fixFileNameAndMime(rawName, rawMime, bytes);
-        const blob = new Blob([bytes], { type: mime });
-        const blobUrl = URL.createObjectURL(blob);
+        rawName = name;
 
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = blobUrl;
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(blobUrl);
-        }, 1000);
-        showToast(`📥 Downloading ${name}...`);
-      } else if (typeof content === 'string' && content.startsWith('blob:')) {
-        const { name } = fixFileNameAndMime(rawName, rawMime, null);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = content;
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => document.body.removeChild(a), 1000);
-        showToast(`📥 Downloading ${name}...`);
+        // Re-construct clean Data URL with verified MIME type
+        dataUrl = `data:${mime};base64,${parts[1]}`;
       } else {
-        const bytes = content instanceof Uint8Array ? content : new Uint8Array(content);
-        const { name, mime } = fixFileNameAndMime(rawName, rawMime, bytes);
-        const blob = new Blob([bytes], { type: mime });
-        const blobUrl = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = blobUrl;
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(blobUrl);
-        }, 1000);
-        showToast(`📥 Downloading ${name}...`);
+        const { name } = fixFileNameAndMime(rawName, rawMime, null);
+        rawName = name;
+        dataUrl = content;
       }
+
+      // Android / iOS / Desktop Native Anchor Download
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = dataUrl;
+      a.download = rawName;
+      a.setAttribute('download', rawName);
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+      }, 1000);
+      showToast(`📥 Downloading ${rawName}...`);
     } catch (e) {
       console.error('Download error:', e);
       showToast('⚠️ Download failed. Please try again.');
