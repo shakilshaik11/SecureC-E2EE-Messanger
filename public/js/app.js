@@ -644,7 +644,8 @@ document.addEventListener('DOMContentLoaded', () => {
       shareLinkInput.value = shareUrl;
 
       if (isPersistent) {
-        await window.e2ee.deriveKeyFromPassphrase(roomCode);
+        const keyToDerive = currentVaultPassphrase || localStorage.getItem('securec_vault_passphrase_' + roomCode) || roomCode;
+        await window.e2ee.deriveKeyFromPassphrase(keyToDerive);
         isE2EEActive = true;
         if (chatPeerStatus) {
           chatPeerStatus.textContent = '🔒 Persistent E2EE Room';
@@ -674,7 +675,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (success && roomCode) {
       currentRoomCode = roomCode;
       if (isPersistent) {
-        await window.e2ee.deriveKeyFromPassphrase(roomCode);
+        const keyToDerive = currentVaultPassphrase || localStorage.getItem('securec_vault_passphrase_' + roomCode) || roomCode;
+        await window.e2ee.deriveKeyFromPassphrase(keyToDerive);
         isE2EEActive = true;
         if (chatPeerStatus) {
           chatPeerStatus.textContent = '🔒 Persistent E2EE Room';
@@ -744,10 +746,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!historyList || historyList.length === 0) return;
 
     // Derive room encryption key if not derived yet
-    if (code && currentVaultPassphrase) {
-      await window.e2ee.deriveKeyFromPassphrase(currentVaultPassphrase);
-    } else if (code) {
-      await window.e2ee.deriveKeyFromPassphrase(code);
+    const keyToDerive = currentVaultPassphrase || localStorage.getItem('securec_vault_passphrase_' + code) || code;
+    if (keyToDerive) {
+      await window.e2ee.deriveKeyFromPassphrase(keyToDerive);
     }
 
     showToast('📜 Restoring E2EE chat history...');
@@ -1009,6 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Store vault passphrase for history decryption
       currentVaultPassphrase = combinedPassphrase;
+      localStorage.setItem('securec_vault_passphrase_' + formattedVaultCode, combinedPassphrase);
 
       // Derive AES-256 Key from Vault ID + Secret Master Password
       await window.e2ee.deriveKeyFromPassphrase(combinedPassphrase);
