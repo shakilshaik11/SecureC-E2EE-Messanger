@@ -38,7 +38,7 @@ export class RoomManager {
   private rooms: Map<string, ActiveRoom> = new Map(); // roomCode -> ActiveRoom
   private userToRoom: Map<string, string> = new Map(); // socketId/userId -> roomCode
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): RoomManager {
     if (!RoomManager.instance) {
@@ -274,7 +274,8 @@ export class RoomManager {
         if (dbMessages && dbMessages.length > 0) {
           const history = dbMessages.map((msg: any) => ({
             id: msg._id ? msg._id.toString() : ('msg_' + Date.now()),
-            senderUserId: msg.senderUserId || 'User',
+            senderUserId: msg.senderUserId || (msg.encryptedPayload && msg.encryptedPayload.senderUserId) || 'User',
+            senderUsername: (msg.encryptedPayload && msg.encryptedPayload.senderUsername) || 'User',
             encryptedPayload: msg.encryptedPayload,
             timestamp: msg.createdAt ? new Date(msg.createdAt).toISOString() : new Date().toISOString()
           }));

@@ -125,13 +125,21 @@
 }
 
 [data-theme="dark"] .glass-input,
+[data-theme="dark"] .glass-input-sm,
 [data-theme="dark"] .chat-textarea {
   background: rgba(30, 41, 59, 0.85);
   color: #f8fafc;
   border-color: rgba(51, 65, 85, 0.80);
 }
 
+[data-theme="dark"] .glass-input::placeholder,
+[data-theme="dark"] .glass-input-sm::placeholder,
+[data-theme="dark"] .chat-textarea::placeholder {
+  color: #94a3b8;
+}
+
 [data-theme="dark"] .glass-input:focus,
+[data-theme="dark"] .glass-input-sm:focus,
 [data-theme="dark"] .chat-textarea:focus {
   background: rgba(30, 41, 59, 1);
   border-color: var(--primary);
@@ -783,10 +791,13 @@ body::before {
 .input-with-icon i {
   position: absolute;
   left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--text-light);
-  font-size: 1rem;
+  font-size: 0.95rem;
   pointer-events: none;
   transition: color 0.2s ease;
+  z-index: 2;
 }
 
 .input-with-icon:focus-within i {
@@ -829,6 +840,10 @@ body::before {
   outline: none;
   font-family: var(--font-body);
   transition: var(--ease);
+}
+
+.input-with-icon .glass-input-sm {
+  padding-left: 38px;
 }
 
 .glass-input-sm:focus {
@@ -1536,6 +1551,30 @@ body::before {
   font-size: 0.84rem;
   animation: cardFadeUp 0.2s ease;
   flex-shrink: 0;
+}
+
+.search-bar-box {
+  gap: 10px;
+}
+
+.search-bar-box .input-with-icon {
+  flex: 1;
+}
+
+.search-bar-box .glass-input-sm {
+  height: 38px;
+  padding: 8px 14px 8px 38px;
+  font-size: 0.88rem;
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.90);
+  color: var(--text-main);
+  box-sizing: border-box;
+}
+
+.search-bar-box .glass-input-sm:focus {
+  background: #ffffff;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
 .reply-preview-box {

@@ -292,6 +292,48 @@
               </button>
             </div>
           </div>
+
+          <!-- MYDATA CLOUD VAULT CARD -->
+          <div class="portal-option-card glass-panel-inner" style="grid-column: 1 / -1; margin-top: 10px; border: 1px solid rgba(147, 51, 234, 0.35);">
+            <div style="display:flex; align-items:center; gap:12px;" class="mb-2">
+              <div class="option-icon"
+                style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff);color:#9333ea;width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+                <i class="fa-solid fa-cloud" aria-hidden="true"></i>
+              </div>
+              <div>
+                <h4 style="margin:0;font-size:1.05rem;">MyData Cloud Vault (Zero-Knowledge)</h4>
+                <p style="margin:0;font-size:0.8rem;opacity:0.8;">Create a unique Vault ID &amp; Secret Password. Access files, notes &amp; documents anywhere without WhatsApp logins.</p>
+              </div>
+            </div>
+
+            <div class="form-group mt-2">
+              <label for="mydata-vault-id-input" class="input-label">Unique Vault ID</label>
+              <div class="input-with-icon">
+                <i class="fa-solid fa-fingerprint" aria-hidden="true"></i>
+                <input type="text" id="mydata-vault-id-input" class="glass-input"
+                  placeholder="e.g. shakil_vault_2026" maxlength="40" autocomplete="off" autocorrect="off"
+                  spellcheck="false" aria-label="MyData Vault ID">
+              </div>
+            </div>
+
+            <div class="form-group mt-2">
+              <label for="mydata-passcode-input" class="input-label">Secret Master Password</label>
+              <div class="input-with-icon">
+                <i class="fa-solid fa-key" aria-hidden="true"></i>
+                <input type="password" id="mydata-passcode-input" class="glass-input"
+                  placeholder="Enter your secret vault password" maxlength="40" autocomplete="off" autocorrect="off"
+                  spellcheck="false" aria-label="MyData Secret Password">
+              </div>
+            </div>
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap;" class="mt-2">
+              <button id="btn-open-mydata" class="btn btn-purple gradient-purple-btn" style="flex:1; min-width:180px;"
+                aria-label="Create or open MyData Vault">
+                <i class="fa-solid fa-vault" aria-hidden="true"></i>
+                <span>Open / Unlock MyData Vault</span>
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -126,12 +126,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   setTimeout(hideLoadingScreen, 5000);
 
-  // App State Variables & Persisted User Identity (sessionStorage per tab/window for multi-tab peer isolation)
-  let tabUid = sessionStorage.getItem('securec_tab_uid');
-  if (!tabUid) {
-    tabUid = 'user_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-    sessionStorage.setItem('securec_tab_uid', tabUid);
+  // App State Variables & Persisted User Identity
+  let persistentUid = localStorage.getItem('securec_user_uid');
+  if (!persistentUid) {
+    persistentUid = 'user_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+    localStorage.setItem('securec_user_uid', persistentUid);
   }
+  let tabUid = sessionStorage.getItem('securec_tab_uid') || persistentUid;
+  sessionStorage.setItem('securec_tab_uid', tabUid);
+
   let savedUsername = localStorage.getItem('securec_username') || 'User';
   let savedAvatar = localStorage.getItem('securec_avatar') || '🧑‍💻';
 
@@ -142,12 +145,16 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function persistUserIdentity() {
-    if (currentUser.uid) sessionStorage.setItem('securec_tab_uid', currentUser.uid);
+    if (currentUser.uid) {
+      sessionStorage.setItem('securec_tab_uid', currentUser.uid);
+      localStorage.setItem('securec_user_uid', currentUser.uid);
+    }
     if (currentUser.username) localStorage.setItem('securec_username', currentUser.username);
     if (currentUser.avatar) localStorage.setItem('securec_avatar', currentUser.avatar);
   }
 
   let currentRoomCode = null;
+  let currentVaultPassphrase = null;
   let peerUser = null;
   let isE2EEActive = false;
   let selectedFile = null;
@@ -700,13 +707,47 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Client-Side Local History Cache Helpers
+  function saveLocalMessageHistory(roomCode, item) {
+    if (!roomCode || !item) return;
+    try {
+      const storageKey = 'securec_history_' + roomCode.toUpperCase();
+      const existing = localStorage.getItem(storageKey);
+      let list = existing ? JSON.parse(existing) : [];
+      const itemId = item.id || (item.encryptedPayload && item.encryptedPayload.id);
+      if (!list.some(m => (m.id === itemId || (m.encryptedPayload && m.encryptedPayload.id === itemId)))) {
+        list.push(item);
+        if (list.length > 300) list = list.slice(list.length - 300);
+        localStorage.setItem(storageKey, JSON.stringify(list));
+      }
+    } catch (e) {
+      console.warn('Local storage message save notice:', e);
+    }
+  }
+
+  function getLocalMessageHistory(roomCode) {
+    if (!roomCode) return [];
+    try {
+      const storageKey = 'securec_history_' + roomCode.toUpperCase();
+      const existing = localStorage.getItem(storageKey);
+      return existing ? JSON.parse(existing) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
   // Server WebSocket Event: Receive Saved Room History
   socket.on('room-history', async ({ roomCode, history }) => {
-    if (!history || !Array.isArray(history) || history.length === 0) return;
+    const code = roomCode || currentRoomCode;
+    let historyList = (history && Array.isArray(history) && history.length > 0) ? history : getLocalMessageHistory(code);
+
+    if (!historyList || historyList.length === 0) return;
 
     // Derive room encryption key if not derived yet
-    if (roomCode) {
-      await window.e2ee.deriveKeyFromPassphrase(roomCode);
+    if (code && currentVaultPassphrase) {
+      await window.e2ee.deriveKeyFromPassphrase(currentVaultPassphrase);
+    } else if (code) {
+      await window.e2ee.deriveKeyFromPassphrase(code);
     }
 
     showToast('📜 Restoring E2EE chat history...');
@@ -723,8 +764,10 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     }
 
-    for (const item of history) {
+    for (const item of historyList) {
       try {
+        saveLocalMessageHistory(code, item);
+
         const encryptedPayload = item.encryptedPayload || item;
         const payloadObj = encryptedPayload.payload || encryptedPayload;
 
@@ -734,27 +777,27 @@ document.addEventListener('DOMContentLoaded', () => {
         let meta = encryptedPayload.meta || {};
 
         if (encryptedPayload.isBinary) {
-          if (mediaType === 'voice') {
-            const base64Audio = window.e2ee.arrayBufferToBase64(decryptedData);
-            const mime = meta.mimeType || 'audio/webm';
-            content = `data:${mime};base64,${base64Audio}`;
-          } else {
-            const blob = new Blob([decryptedData], { type: meta.mimeType || 'application/octet-stream' });
-            content = URL.createObjectURL(blob);
-          }
+          const base64Data = window.e2ee.arrayBufferToBase64(decryptedData);
+          const mime = meta.mimeType || (mediaType === 'image' ? 'image/png' : (mediaType === 'voice' ? 'audio/webm' : 'application/octet-stream'));
+          content = `data:${mime};base64,${base64Data}`;
         }
 
         const itemSenderId = item.senderUserId || (encryptedPayload && encryptedPayload.senderUserId);
         const itemSenderName = item.senderUsername || (encryptedPayload && encryptedPayload.senderUsername);
+        const storedUid = localStorage.getItem('securec_user_uid');
+        const storedName = localStorage.getItem('securec_username');
 
         let isOwn = false;
-        if (itemSenderId && currentUser.uid) {
-          isOwn = (itemSenderId === currentUser.uid);
-        } else if (itemSenderName && currentUser.username && currentUser.username !== 'User') {
-          isOwn = (itemSenderName === currentUser.username);
+        if (itemSenderId && (itemSenderId === currentUser.uid || itemSenderId === storedUid)) {
+          isOwn = true;
+        } else if (itemSenderName) {
+          const sName = String(itemSenderName).toLowerCase();
+          if ((currentUser.username && sName === currentUser.username.toLowerCase()) || (storedName && sName === storedName.toLowerCase())) {
+            isOwn = true;
+          }
         }
 
-        const senderName = isOwn ? currentUser.username : (itemSenderName || (peerUser ? peerUser.username : 'Participant'));
+        const senderName = isOwn ? (currentUser.username || storedName || 'Me') : (itemSenderName || (peerUser ? peerUser.username : 'Participant'));
 
         appendMessageToFeed({
           id: encryptedPayload.id || item.id || ('msg_' + Date.now()),
@@ -911,6 +954,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
       socket.emit('join-room', {
         roomCode: customCode,
+        userId,
+        username: currentUser.username,
+        avatar: currentUser.avatar,
+        isPersistent: true
+      });
+    });
+  }
+
+  // MyData Cloud Vault Elements & Click Handlers
+  const btnHomeMyData = document.getElementById('btn-home-mydata');
+  const mydataVaultIdInput = document.getElementById('mydata-vault-id-input');
+  const mydataPasscodeInput = document.getElementById('mydata-passcode-input');
+  const btnOpenMydata = document.getElementById('btn-open-mydata');
+  const navBtnMydata = document.getElementById('nav-btn-mydata');
+
+  if (btnHomeMyData) {
+    btnHomeMyData.addEventListener('click', () => {
+      showScreen(stepPortal);
+      if (mydataVaultIdInput) mydataVaultIdInput.focus();
+    });
+  }
+
+  if (navBtnMydata) {
+    navBtnMydata.addEventListener('click', () => {
+      showScreen(stepPortal);
+      if (mydataVaultIdInput) mydataVaultIdInput.focus();
+    });
+  }
+
+  if (btnOpenMydata) {
+    btnOpenMydata.addEventListener('click', async () => {
+      const vaultId = mydataVaultIdInput ? mydataVaultIdInput.value.trim() : '';
+      const masterPasscode = mydataPasscodeInput ? mydataPasscodeInput.value.trim() : '';
+
+      if (!vaultId || vaultId.length < 3) {
+        alert('Please enter a Unique Vault ID (at least 3 characters, e.g. shakil_vault_2026)');
+        if (mydataVaultIdInput) mydataVaultIdInput.focus();
+        return;
+      }
+
+      if (!masterPasscode || masterPasscode.length < 3) {
+        alert('Please enter your Secret Master Password (at least 3 characters)');
+        if (mydataPasscodeInput) mydataPasscodeInput.focus();
+        return;
+      }
+
+      const formattedVaultCode = 'MYDATA_' + vaultId.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+      const combinedPassphrase = formattedVaultCode + '_' + masterPasscode;
+
+      btnOpenMydata.disabled = true;
+      btnOpenMydata.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Unlocking Vault...';
+
+      // Store vault passphrase for history decryption
+      currentVaultPassphrase = combinedPassphrase;
+
+      // Derive AES-256 Key from Vault ID + Secret Master Password
+      await window.e2ee.deriveKeyFromPassphrase(combinedPassphrase);
+
+      currentRoomCode = formattedVaultCode;
+      isE2EEActive = true;
+
+      const userId = currentUser.uid || 'user_' + Math.random().toString(36).substring(2, 9);
+      currentUser.uid = userId;
+
+      socket.emit('join-room', {
+        roomCode: formattedVaultCode,
         userId,
         username: currentUser.username,
         avatar: currentUser.avatar,
@@ -1078,15 +1187,18 @@ document.addEventListener('DOMContentLoaded', () => {
       let meta = encryptedPayload.meta || {};
 
       if (encryptedPayload.isBinary) {
-        if (mediaType === 'voice') {
-          const base64Audio = window.e2ee.arrayBufferToBase64(decryptedData);
-          const mime = meta.mimeType || 'audio/webm';
-          content = `data:${mime};base64,${base64Audio}`;
-        } else {
-          const blob = new Blob([decryptedData], { type: meta.mimeType || 'application/octet-stream' });
-          content = URL.createObjectURL(blob);
-        }
+        const base64Data = window.e2ee.arrayBufferToBase64(decryptedData);
+        const mime = meta.mimeType || (mediaType === 'image' ? 'image/png' : (mediaType === 'voice' ? 'audio/webm' : 'application/octet-stream'));
+        content = `data:${mime};base64,${base64Data}`;
       }
+
+      saveLocalMessageHistory(currentRoomCode, {
+        id: encryptedPayload.id || ('msg_' + Date.now()),
+        senderUserId: data.senderUserId,
+        senderUsername: senderName,
+        encryptedPayload: encryptedPayload,
+        timestamp: data.timestamp || new Date().toISOString()
+      });
 
       appendMessageToFeed({
         id: encryptedPayload.id || ('msg_' + Date.now()),
@@ -1131,8 +1243,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Socket Event: Receive Message Reaction
-  socket.on('receive-message-reaction', ({ senderUsername, messageId, emoji }) => {
-    updateMessageReaction(messageId, emoji, senderUsername || 'Peer');
+  socket.on('receive-message-reaction', ({ senderUsername, senderUserId, messageId, emoji }) => {
+    const user = senderUsername || senderUserId || 'Peer';
+    updateMessageReaction(messageId, emoji, user);
   });
 
   // Socket Event: Receive Pinned Message
@@ -1383,13 +1496,239 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('📌 Message Pinned to Room Header');
   };
 
+  // =========================================================================
+  // CUSTOM REACTION EMOJIS & PICKER MODAL
+  // =========================================================================
+  const DEFAULT_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+  let activeReactionModalMessageId = null;
+
+  function getQuickReactionEmojis() {
+    try {
+      const saved = localStorage.getItem('securec_custom_reaction_emojis');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Error reading custom reaction emojis:', e);
+    }
+    return [...DEFAULT_REACTION_EMOJIS];
+  }
+
+  function saveQuickReactionEmojis(emojis) {
+    try {
+      localStorage.setItem('securec_custom_reaction_emojis', JSON.stringify(emojis));
+    } catch (e) {
+      console.error('Error saving custom reaction emojis:', e);
+    }
+  }
+
+  window.addCustomReactionEmoji = function (emoji) {
+    if (!emoji || typeof emoji !== 'string') return;
+    const cleanEmoji = emoji.trim();
+    if (!cleanEmoji) return;
+
+    let list = getQuickReactionEmojis();
+    if (!list.includes(cleanEmoji)) {
+      list.push(cleanEmoji);
+      saveQuickReactionEmojis(list);
+      updateAllReactionToolbarsUI();
+    }
+  };
+
+  window.removeCustomReactionEmoji = function (emoji) {
+    let list = getQuickReactionEmojis();
+    list = list.filter(e => e !== emoji);
+
+    if (list.length === 0 || list.every(e => DEFAULT_REACTION_EMOJIS.includes(e))) {
+      localStorage.removeItem('securec_custom_reaction_emojis');
+    } else {
+      saveQuickReactionEmojis(list);
+    }
+
+    renderEmojiPickerModalContent();
+    updateAllReactionToolbarsUI();
+  };
+
+  function resetQuickReactionEmojis() {
+    localStorage.removeItem('securec_custom_reaction_emojis');
+    renderEmojiPickerModalContent();
+    updateAllReactionToolbarsUI();
+    showToast('✨ Quick reactions reset to default 6 emojis');
+  }
+
+  function buildReactionsToolbarHtml(messageId) {
+    const emojis = getQuickReactionEmojis();
+    const emojiBtnsHtml = emojis.map(e => `
+      <button class="reaction-emoji-btn" title="React ${e}" onclick="triggerReaction('${messageId}', '${e}')">${e}</button>
+    `).join('');
+
+    return `
+      <div class="reactions-toolbar" id="reactions-toolbar-${messageId}">
+        ${emojiBtnsHtml}
+        <button class="reaction-add-btn" title="More Emojis (+)" onclick="openEmojiPickerModal('${messageId}', event)">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+        <button class="reaction-action-icon" title="Reply" onclick="triggerReplyMessage('${messageId}')">
+          <i class="fa-solid fa-reply"></i>
+        </button>
+      </div>
+    `;
+  }
+
+  function updateAllReactionToolbarsUI() {
+    messageStore.forEach((msg, id) => {
+      const tb = document.getElementById(`reactions-toolbar-${id}`);
+      if (tb) {
+        const parent = tb.parentElement;
+        if (parent) {
+          const tempContainer = document.createElement('div');
+          tempContainer.innerHTML = buildReactionsToolbarHtml(id);
+          const newTb = tempContainer.firstElementChild;
+          if (tb.classList.contains('active')) newTb.classList.add('active');
+          if (tb.classList.contains('closed')) newTb.classList.add('closed');
+          parent.replaceChild(newTb, tb);
+        }
+      }
+    });
+  }
+
+  const emojiCategories = {
+    reactions: ['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '✨', '🎉', '💯', '🚀', '🥳', '🤩', '😎'],
+    smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '🥹', '😉', '😊', '🥰', '😍', '😘', '😋', '😜', '🤪', '😝', '🤑', '🤗', '🫣', '🤫', '🤔', '🫡', '🙄', '😬', '😔', '😴', '😷', '🤒', '🤢', '🤮', '🤯', '🤠', '💩', '💀', '👽', '🤖'],
+    gestures: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🫰', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '✍️', '💅', '🤳', '💪'],
+    symbols: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '⭐', '🌟', '✨', '💥', '💯', '🎯', '🎨', '🔥', '💧', '⚡', '🏆', '🎁', '🎂', '🍕', '🥂']
+  };
+
+  const emojiPickerModal = document.getElementById('emoji-picker-modal');
+  const btnCloseEmojiModal = document.getElementById('btn-close-emoji-modal');
+  const btnResetQuickEmojis = document.getElementById('btn-reset-quick-emojis');
+  const customEmojiInput = document.getElementById('custom-emoji-input');
+  const btnSubmitCustomEmoji = document.getElementById('btn-submit-custom-emoji');
+
+  window.openEmojiPickerModal = function (messageId, event) {
+    if (event) event.stopPropagation();
+    activeReactionModalMessageId = messageId;
+    renderEmojiPickerModalContent();
+    if (customEmojiInput) customEmojiInput.value = '';
+    if (emojiPickerModal) emojiPickerModal.classList.remove('hidden');
+
+    // Hide any open reactions toolbar
+    const tb = document.getElementById(`reactions-toolbar-${messageId}`);
+    if (tb) {
+      tb.classList.remove('active');
+      tb.classList.add('closed');
+    }
+  };
+
+  function closeEmojiPickerModal() {
+    if (emojiPickerModal) emojiPickerModal.classList.add('hidden');
+    activeReactionModalMessageId = null;
+  }
+
+  function renderEmojiPickerModalContent() {
+    const quickListContainer = document.getElementById('quick-emojis-list');
+    if (quickListContainer) {
+      const currentEmojis = getQuickReactionEmojis();
+      const isCustomized = localStorage.getItem('securec_custom_reaction_emojis') !== null;
+
+      quickListContainer.innerHTML = currentEmojis.map(emoji => {
+        const isDefault = DEFAULT_REACTION_EMOJIS.includes(emoji);
+        const showRemove = isCustomized || !isDefault;
+        return `
+          <div class="quick-emoji-chip">
+            <span>${emoji}</span>
+            ${showRemove ? `<button class="btn-remove-emoji" title="Remove emoji" onclick="removeCustomReactionEmoji('${emoji}')"><i class="fa-solid fa-xmark"></i></button>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    for (const [catKey, emojiList] of Object.entries(emojiCategories)) {
+      const gridContainer = document.getElementById(`emoji-grid-${catKey}`);
+      if (gridContainer) {
+        gridContainer.innerHTML = emojiList.map(e => `
+          <button class="emoji-grid-item" onclick="selectModalEmoji('${e}')">${e}</button>
+        `).join('');
+      }
+    }
+  }
+
+  window.selectModalEmoji = function (emoji) {
+    if (!activeReactionModalMessageId) return;
+    addCustomReactionEmoji(emoji);
+    triggerReaction(activeReactionModalMessageId, emoji);
+    closeEmojiPickerModal();
+  };
+
+  if (btnCloseEmojiModal) {
+    btnCloseEmojiModal.addEventListener('click', closeEmojiPickerModal);
+  }
+
+  if (btnResetQuickEmojis) {
+    btnResetQuickEmojis.addEventListener('click', () => {
+      resetQuickReactionEmojis();
+    });
+  }
+
+  function handleCustomEmojiSubmit() {
+    if (!customEmojiInput || !activeReactionModalMessageId) return;
+    const val = customEmojiInput.value.trim();
+    if (!val) return;
+
+    addCustomReactionEmoji(val);
+    triggerReaction(activeReactionModalMessageId, val);
+    closeEmojiPickerModal();
+  }
+
+  if (btnSubmitCustomEmoji) {
+    btnSubmitCustomEmoji.addEventListener('click', handleCustomEmojiSubmit);
+  }
+
+  if (customEmojiInput) {
+    customEmojiInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleCustomEmojiSubmit();
+      }
+    });
+  }
+
+  window.toggleReactionToolbar = function (id, event) {
+    if (event) event.stopPropagation();
+    const toolbar = document.getElementById(`reactions-toolbar-${id}`);
+    if (!toolbar) return;
+
+    document.querySelectorAll('.reactions-toolbar.active').forEach(tb => {
+      if (tb !== toolbar) {
+        tb.classList.remove('active');
+        tb.classList.add('closed');
+      }
+    });
+
+    toolbar.classList.remove('closed');
+    toolbar.classList.toggle('active');
+  };
+
   window.triggerReaction = function (id, emoji) {
+    const username = (currentUser && currentUser.username) ? currentUser.username : 'User';
     socket.emit('message-reaction', {
       roomCode: currentRoomCode,
       messageId: id,
-      emoji: emoji
+      emoji: emoji,
+      senderUsername: username,
+      senderUserId: (currentUser && currentUser.id) || socket.id
     });
-    updateMessageReaction(id, emoji, currentUser.username);
+    updateMessageReaction(id, emoji, username);
+
+    // Auto-close reaction toolbar immediately after reacting (WhatsApp style)
+    const toolbar = document.getElementById(`reactions-toolbar-${id}`);
+    if (toolbar) {
+      toolbar.classList.remove('active');
+      toolbar.classList.add('closed');
+    }
   };
 
   window.jumpToMessage = function (id) {
@@ -1405,13 +1744,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const msg = messageStore.get(messageId);
     if (!msg) return;
 
-    if (!msg.reactions[emoji]) {
-      msg.reactions[emoji] = new Set();
+    if (!msg.reactions) {
+      msg.reactions = {};
     }
 
-    if (msg.reactions[emoji].has(user)) {
-      msg.reactions[emoji].delete(user);
-    } else {
+    // Check if user already reacted with this exact emoji
+    const alreadyHasThisEmoji = msg.reactions[emoji] && (
+      (msg.reactions[emoji] instanceof Set && msg.reactions[emoji].has(user)) ||
+      (Array.isArray(msg.reactions[emoji]) && msg.reactions[emoji].includes(user))
+    );
+
+    // Enforce strictly ONE reaction per user per message (remove user from all existing emoji Sets on this message)
+    for (const [e, userSet] of Object.entries(msg.reactions)) {
+      if (userSet instanceof Set) {
+        userSet.delete(user);
+      } else if (Array.isArray(userSet)) {
+        msg.reactions[e] = userSet.filter(u => u !== user);
+      }
+    }
+
+    // If user clicked a different emoji (or was new), add user to the target emoji Set (if same emoji, it toggled off)
+    if (!alreadyHasThisEmoji) {
+      if (!(msg.reactions[emoji] instanceof Set)) {
+        const existing = Array.isArray(msg.reactions[emoji]) ? msg.reactions[emoji] : [];
+        msg.reactions[emoji] = new Set(existing);
+      }
       msg.reactions[emoji].add(user);
     }
 
@@ -1421,9 +1778,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let emojisUsed = [];
     let totalCount = 0;
     for (const [e, userSet] of Object.entries(msg.reactions)) {
-      if (userSet.size > 0) {
+      const count = (userSet instanceof Set) ? userSet.size : (Array.isArray(userSet) ? userSet.length : 0);
+      if (count > 0) {
         emojisUsed.push(e);
-        totalCount += userSet.size;
+        totalCount += count;
       }
     }
 
@@ -1512,13 +1870,15 @@ document.addEventListener('DOMContentLoaded', () => {
           encryptedPayload: payload
         });
 
-        // Display own image/file in feed
-        const blobUrl = URL.createObjectURL(selectedFile);
+        const base64Data = window.e2ee.arrayBufferToBase64(arrayBuffer);
+        const mime = selectedFile.type || 'application/octet-stream';
+        const dataUrl = `data:${mime};base64,${base64Data}`;
+
         appendMessageToFeed({
           id: messageId,
           sender: currentUser.username,
           isOwn: true,
-          content: blobUrl,
+          content: dataUrl,
           mediaType: mediaType,
           fileName: selectedFile.name,
           fileSize: formatBytes(selectedFile.size),
@@ -1551,6 +1911,14 @@ document.addEventListener('DOMContentLoaded', () => {
         roomCode: currentRoomCode,
         userId: currentUser.uid,
         encryptedPayload: payload
+      });
+
+      saveLocalMessageHistory(currentRoomCode, {
+        id: messageId,
+        senderUserId: currentUser.uid,
+        senderUsername: currentUser.username,
+        encryptedPayload: payload,
+        timestamp: new Date().toISOString()
       });
 
       appendMessageToFeed({
@@ -1987,6 +2355,68 @@ document.addEventListener('DOMContentLoaded', () => {
   // UI FEED & UTILITY HELPERS
   // =========================================================================
 
+  // Programmatic File Download Helper (Prevents Chrome "File can't be downloaded securely" Blob warning)
+  window.downloadAttachment = function (id) {
+    const msg = messageStore.get(id);
+    if (!msg || !msg.content) {
+      showToast('⚠️ File content unavailable for download.');
+      return;
+    }
+
+    const fileName = msg.fileName || 'securec_file';
+    const content = msg.content;
+
+    try {
+      if (typeof content === 'string' && content.startsWith('data:')) {
+        const parts = content.split(';base64,');
+        const mime = parts[0].replace('data:', '') || 'application/octet-stream';
+        const binaryStr = window.atob(parts[1]);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        }, 1000);
+      } else if (typeof content === 'string' && content.startsWith('blob:')) {
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = content;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 1000);
+      } else {
+        const blob = new Blob([content], { type: 'application/octet-stream' });
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        }, 1000);
+      }
+      showToast(`📥 Downloading ${fileName}...`);
+    } catch (e) {
+      console.error('Download error:', e);
+      showToast('⚠️ Download failed. Please try again.');
+    }
+  };
+
   function appendMessageToFeed({ id, sender, isOwn, content, mediaType, fileName, fileSize, replyTo, createdTime, timestamp }) {
     createdTime = createdTime || Date.now();
     const msgObj = {
@@ -2021,7 +2451,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let bodyHtml = '';
     if (mediaType === 'image') {
-      bodyHtml = `<img src="${content}" alt="Attachment" class="message-media-img">`;
+      bodyHtml = `
+        <div style="position:relative; display:inline-block; max-width:100%;">
+          <img src="${content}" alt="Attachment" class="message-media-img">
+          <button type="button" onclick="downloadAttachment('${id}')" class="btn btn-sm btn-outline" style="margin-top:6px; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <i class="fa-solid fa-download"></i> Download Image
+          </button>
+        </div>`;
     } else if (mediaType === 'file') {
       bodyHtml = `
         <div class="file-attachment-card">
@@ -2030,7 +2466,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><strong>${escapeHtml(fileName || 'Download File')}</strong></div>
             <span class="text-muted" style="font-size:0.75rem">${fileSize || ''}</span>
           </div>
-          <a href="${content}" download="${escapeHtml(fileName || 'file')}" class="btn btn-sm btn-outline ml-auto">Download</a>
+          <button type="button" onclick="downloadAttachment('${id}')" class="btn btn-sm btn-outline ml-auto" style="display:flex; align-items:center; gap:6px;">
+            <i class="fa-solid fa-download"></i> Download
+          </button>
         </div>`;
     } else if (mediaType === 'voice') {
       bodyHtml = `
@@ -2059,17 +2497,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const canEdit = isOwn && mediaType === 'text';
 
     // Floating Quick Reactions Popover Toolbar
-    const reactionsToolbarHtml = `
-      <div class="reactions-toolbar">
-        <button class="reaction-emoji-btn" title="React 👍" onclick="triggerReaction('${id}', '👍')">👍</button>
-        <button class="reaction-emoji-btn" title="React ❤️" onclick="triggerReaction('${id}', '❤️')">❤️</button>
-        <button class="reaction-emoji-btn" title="React 😂" onclick="triggerReaction('${id}', '😂')">😂</button>
-        <button class="reaction-emoji-btn" title="React 😮" onclick="triggerReaction('${id}', '😮')">😮</button>
-        <button class="reaction-emoji-btn" title="React 😢" onclick="triggerReaction('${id}', '😢')">😢</button>
-        <button class="reaction-emoji-btn" title="React 🙏" onclick="triggerReaction('${id}', '🙏')">🙏</button>
-        <button class="reaction-action-icon" title="Reply" onclick="triggerReplyMessage('${id}')"><i class="fa-solid fa-reply"></i></button>
-      </div>
-    `;
+    const reactionsToolbarHtml = buildReactionsToolbarHtml(id);
 
     // Chevron Context Menu Dropdown
     const chevronMenuHtml = `
@@ -2116,9 +2544,60 @@ document.addEventListener('DOMContentLoaded', () => {
     if (menu) menu.classList.toggle('hidden');
   };
 
-  document.addEventListener('click', () => {
+  document.addEventListener('click', (e) => {
     document.querySelectorAll('.message-menu-dropdown').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.reactions-toolbar.active').forEach(tb => {
+      tb.classList.remove('active');
+      tb.classList.add('closed');
+    });
+
+    if (emojiPickerModal && !emojiPickerModal.classList.contains('hidden')) {
+      const modalContent = emojiPickerModal.querySelector('.modal-content');
+      if (modalContent && !modalContent.contains(e.target) && !e.target.closest('.reaction-add-btn')) {
+        closeEmojiPickerModal();
+      }
+    }
   });
+
+  // Double-tap & Double-click on message bubble to open reaction toolbar (WhatsApp style)
+  let lastTapTime = 0;
+  let lastTapMsgId = null;
+
+  if (chatFeed) {
+    chatFeed.addEventListener('dblclick', (e) => {
+      if (e.target.closest('button, a, input, audio, .message-chevron-btn')) return;
+      const bubbleWrapper = e.target.closest('.message-bubble-wrapper');
+      if (!bubbleWrapper) return;
+      const msgRow = bubbleWrapper.closest('.message-row');
+      if (msgRow && msgRow.id) {
+        const msgId = msgRow.id.replace('msg-', '');
+        toggleReactionToolbar(msgId, e);
+      }
+    });
+
+    chatFeed.addEventListener('touchend', (e) => {
+      if (e.target.closest('button, a, input, audio, .message-chevron-btn')) return;
+      const bubbleWrapper = e.target.closest('.message-bubble-wrapper');
+      if (!bubbleWrapper) return;
+
+      const msgRow = bubbleWrapper.closest('.message-row');
+      if (!msgRow || !msgRow.id) return;
+
+      const msgId = msgRow.id.replace('msg-', '');
+      const now = Date.now();
+      const timeDiff = now - lastTapTime;
+
+      if (timeDiff < 320 && lastTapMsgId === msgId) {
+        e.preventDefault();
+        toggleReactionToolbar(msgId, e);
+        lastTapTime = 0;
+        lastTapMsgId = null;
+      } else {
+        lastTapTime = now;
+        lastTapMsgId = msgId;
+      }
+    });
+  }
 
   function showSystemNotification(text) {
     const sys = document.createElement('div');

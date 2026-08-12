@@ -10,24 +10,21 @@
 
 ## ✨ Key Features
 
-- 🔒 **Zero-Knowledge Architecture**: All messages, media, and voice notes are encrypted client-side using AES-GCM (256-bit) and Elliptic Curve Diffie-Hellman (ECDH) key exchange.
-- ⚡ **Real-Time WebSockets**: Instant message delivery with live online/offline indicators, typing notifications, and read receipts.
-- 🎙️ **Encrypted Voice Notes**: Record and transmit end-to-end encrypted audio voice notes directly inside the chat feed.
-- 📁 **Chunked File Transfer**: High-speed, encrypted chunked file sharing for documents, images, and media.
-- 🔑 **Ephemeral & Persistent Rooms**: Create temporary 6-digit room codes for quick chats or personal persistent vault rooms using custom passcodes.
-- 🎨 **Glassmorphism UI**: Modern aesthetic design system with light/dark glass theme switcher, fluid responsive layouts for mobile and desktop, and zero horizontal overflow.
-- 💾 **Dual Storage Engine**: Automatic MongoDB Atlas integration for persistent sessions with zero-knowledge in-memory fallback.
-- 🧪 **Automated Testing Suite**: 100% automated test pass rate with Jest & Supertest unit and integration tests.
+- 🔒 **Zero-Knowledge Architecture**: All messages, media, and voice notes are encrypted client-side using AES-GCM (256-bit) and ECDH key exchange.
+- ⚡ **Real-Time WebSockets**: Instant message delivery with live online/offline status, typing indicators, and read receipts.
+- 🔑 **Ephemeral & Personal Saved Rooms**: Temporary 6-character room codes or persistent personal rooms with custom passcodes.
+- 🎙️ **Encrypted Voice Notes & Media**: Send end-to-end encrypted audio voice notes, images, and files directly inside the chat feed.
+- 🎨 **Glassmorphism Design**: Responsive UI with light/dark glass theme switcher and mobile-first navigation bar.
+- 💾 **Dual Storage Engine**: MongoDB Atlas persistence with zero-knowledge local client fallback.
 
 ---
 
 ## 🛠️ Technology Stack
 
 - **Frontend**: HTML5, ESNext JavaScript, Glassmorphism Vanilla CSS, FontAwesome 6, W3C Web Crypto API
-- **Backend**: Node.js, Express, TypeScript, Native WebSockets (`ws`), Mongoose / MongoDB Atlas
-- **Security & Auth**: JSON Web Tokens (JWT), Helmet.js Security Headers, Express Rate Limiting, AES-GCM & ECDH Cryptography
+- **Backend**: Node.js, Express, TypeScript, Native WebSockets (`ws`), Mongoose / MongoDB
+- **Security**: JWT Authentication, Helmet.js Security Headers, Rate Limiting, AES-GCM & ECDH Cryptography
 - **Testing**: Jest, Supertest, `ts-jest`
-- **Deployment**: Docker, Render, Vercel ready
 
 ---
 
@@ -35,8 +32,8 @@
 
 ### 1. Clone & Install
 ```bash
-git clone https://github.com/shakilshaik11/SecureC-E2EE-Messenger.git
-cd SecureC-E2EE-Messenger
+git clone https://github.com/shakilshaik11/SecureC-E2EE-Messanger.git
+cd SecureC-E2EE-Messanger
 npm install
 ```
 
@@ -64,17 +61,3 @@ npm run build
 npm start
 ```
 
----
-
-## 🌐 Deploying to Render.com (100% Free)
-
-1. Push this repository to your GitHub account:
-   ```bash
-   git add .
-   git commit -m "Initial release"
-   git push -u origin main
-   ```
-2. Log in to [Render.com](https://render.com) → Click **New Web Service** → Connect your repository `SecureC-E2EE-Messenger`.
-3. Set **Build Command**: `npm install && npm run build` and **Start Command**: `npm start`.
-4. Add environment variables (`NODE_ENV=production`, `PORT=10000`, `MONGODB_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET`).
-5. Click **Create Web Service** to launch your live 24/7 HTTPS & WebSocket URL!
