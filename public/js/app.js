@@ -770,13 +770,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const encryptedPayload = item.encryptedPayload || item;
         const payloadObj = encryptedPayload.payload || encryptedPayload;
+        const isBinary = !!(encryptedPayload.isBinary || payloadObj.isBinary);
 
-        const decryptedData = await window.e2ee.decrypt(payloadObj);
+        const decryptedData = await window.e2ee.decrypt(payloadObj, isBinary);
         let content = decryptedData;
         let mediaType = encryptedPayload.mediaType || 'text';
-        let meta = encryptedPayload.meta || {};
+        let meta = encryptedPayload.meta || item.meta || (payloadObj && payloadObj.meta) || {};
 
-        if (encryptedPayload.isBinary) {
+        if (isBinary) {
           const base64Data = window.e2ee.arrayBufferToBase64(decryptedData);
           const mime = meta.mimeType || (mediaType === 'image' ? 'image/png' : (mediaType === 'voice' ? 'audio/webm' : 'application/octet-stream'));
           content = `data:${mime};base64,${base64Data}`;
@@ -1178,15 +1179,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const encryptedPayload = data.encryptedPayload || data;
       const payloadObj = encryptedPayload.payload || encryptedPayload;
       const senderName = peerUser ? peerUser.username : 'Peer';
+      const isBinary = !!(encryptedPayload.isBinary || payloadObj.isBinary);
 
       // Decrypt client-side using shared key
-      const decryptedData = await window.e2ee.decrypt(payloadObj);
+      const decryptedData = await window.e2ee.decrypt(payloadObj, isBinary);
 
       let content = decryptedData;
       let mediaType = encryptedPayload.mediaType || 'text';
-      let meta = encryptedPayload.meta || {};
+      let meta = encryptedPayload.meta || (payloadObj && payloadObj.meta) || {};
 
-      if (encryptedPayload.isBinary) {
+      if (isBinary) {
         const base64Data = window.e2ee.arrayBufferToBase64(decryptedData);
         const mime = meta.mimeType || (mediaType === 'image' ? 'image/png' : (mediaType === 'voice' ? 'audio/webm' : 'application/octet-stream'));
         content = `data:${mime};base64,${base64Data}`;
@@ -1849,7 +1851,23 @@ document.addEventListener('DOMContentLoaded', () => {
       reader.onload = async (e) => {
         const arrayBuffer = e.target.result;
         const encrypted = await window.e2ee.encrypt(arrayBuffer, true);
-        const mediaType = selectedFile.type.startsWith('image/') ? 'image' : 'file';
+        
+        let fileMime = selectedFile.type;
+        if (!fileMime || fileMime === '') {
+          const ext = selectedFile.name.split('.').pop().toLowerCase();
+          if (ext === 'pdf') fileMime = 'application/pdf';
+          else if (ext === 'png') fileMime = 'image/png';
+          else if (ext === 'jpg' || ext === 'jpeg') fileMime = 'image/jpeg';
+          else if (ext === 'docx') fileMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          else if (ext === 'doc') fileMime = 'application/msword';
+          else if (ext === 'xlsx') fileMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          else if (ext === 'pptx') fileMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+          else if (ext === 'zip') fileMime = 'application/zip';
+          else if (ext === 'txt') fileMime = 'text/plain';
+          else fileMime = 'application/octet-stream';
+        }
+
+        const mediaType = (fileMime && fileMime.startsWith('image/')) ? 'image' : 'file';
 
         const payload = {
           id: messageId,
@@ -1859,7 +1877,7 @@ document.addEventListener('DOMContentLoaded', () => {
           meta: {
             fileName: selectedFile.name,
             fileSize: formatBytes(selectedFile.size),
-            mimeType: selectedFile.type
+            mimeType: fileMime
           },
           payload: encrypted
         };
@@ -1871,8 +1889,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const base64Data = window.e2ee.arrayBufferToBase64(arrayBuffer);
-        const mime = selectedFile.type || 'application/octet-stream';
-        const dataUrl = `data:${mime};base64,${base64Data}`;
+        const dataUrl = `data:${fileMime};base64,${base64Data}`;
 
         appendMessageToFeed({
           id: messageId,
@@ -2507,20 +2524,24 @@ document.addEventListener('DOMContentLoaded', () => {
       bodyHtml = `
         <div style="position:relative; display:inline-block; max-width:100%;">
           <img src="${content}" alt="Attachment" class="message-media-img">
-          <button type="button" onclick="downloadAttachment('${id}')" class="btn btn-sm btn-outline" style="margin-top:6px; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
-            <i class="fa-solid fa-download"></i> Download Image
+          <button type="button" onclick="downloadAttachment('${id}')" class="btn-icon-glass download-icon-btn" title="Download Photo" aria-label="Download Photo" style="position:absolute; bottom:10px; right:10px; background:rgba(0,0,0,0.65); color:#fff; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center;">
+            <i class="fa-solid fa-download"></i>
           </button>
         </div>`;
     } else if (mediaType === 'file') {
       bodyHtml = `
-        <div class="file-attachment-card">
-          <i class="fa-solid fa-file-arrow-down"></i>
-          <div>
-            <div><strong>${escapeHtml(fileName || 'Download File')}</strong></div>
-            <span class="text-muted" style="font-size:0.75rem">${fileSize || ''}</span>
+        <div class="file-attachment-card" style="display:flex; align-items:center; justify-space-between; gap:12px; padding:10px 14px; background:rgba(255,255,255,0.06); border-radius:12px; border:1px solid rgba(255,255,255,0.12);">
+          <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+            <div style="width:38px; height:38px; border-radius:10px; background:rgba(99,102,241,0.15); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0;">
+              <i class="fa-solid fa-file-lines"></i>
+            </div>
+            <div style="min-width:0;">
+              <div style="font-weight:600; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(fileName || 'Attachment')}</div>
+              <div class="text-muted" style="font-size:0.75rem;">${fileSize || 'Document'}</div>
+            </div>
           </div>
-          <button type="button" onclick="downloadAttachment('${id}')" class="btn btn-sm btn-outline ml-auto" style="display:flex; align-items:center; gap:6px;">
-            <i class="fa-solid fa-download"></i> Download
+          <button type="button" onclick="downloadAttachment('${id}')" class="btn-icon-glass" title="Download Document" aria-label="Download Document" style="flex-shrink:0; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--primary); color:#fff;">
+            <i class="fa-solid fa-download"></i>
           </button>
         </div>`;
     } else if (mediaType === 'voice') {

@@ -254,13 +254,15 @@ class E2EECrypto {
   /**
    * Decrypt AES-GCM ciphertext payload
    */
-  async decrypt(payload) {
+  async decrypt(payload, forceBinary = false) {
     if (!this.sharedAESKey) {
       await this.deriveSharedSecret();
     }
 
+    const isBinaryPayload = !!(payload.isBinary || forceBinary);
+
     if (this.sharedAESKey.isFallback || !this.isWebCryptoAvailable() || payload.isFallback) {
-      return this.fallbackDecrypt(payload);
+      return this.fallbackDecrypt(payload, isBinaryPayload);
     }
 
     const iv = this.base64ToArrayBuffer(payload.iv);
@@ -275,7 +277,7 @@ class E2EECrypto {
       ciphertext
     );
 
-    if (payload.isBinary) {
+    if (isBinaryPayload) {
       return decryptedBuffer;
     } else {
       const decoder = new TextDecoder();
@@ -299,8 +301,9 @@ class E2EECrypto {
     };
   }
 
-  fallbackDecrypt(payload) {
-    if (payload.isBinary) {
+  fallbackDecrypt(payload, forceBinary = false) {
+    const isBinaryPayload = !!(payload.isBinary || forceBinary);
+    if (isBinaryPayload) {
       return this.base64ToArrayBuffer(payload.ciphertext);
     } else {
       try {
@@ -319,29 +322,38 @@ class E2EECrypto {
    * Safe Chunked ArrayBuffer to Base64 conversion (prevents stack size overflow on Mobile browsers)
    */
   arrayBufferToBase64(buffer) {
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    const chunkSize = 8192;
-    let binary = '';
+    if (!buffer) return '';
+    try {
+      const bytes = new Uint8Array(buffer instanceof ArrayBuffer ? buffer : buffer.buffer);
+      const len = bytes.byteLength;
+      const chunkSize = 8192;
+      let binary = '';
 
-    for (let i = 0; i < len; i += chunkSize) {
-      const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
-      binary += String.fromCharCode.apply(null, chunk);
+      for (let i = 0; i < len; i += chunkSize) {
+        const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
+        binary += String.fromCharCode.apply(null, chunk);
+      }
+      return window.btoa(binary);
+    } catch (e) {
+      console.error('Error in arrayBufferToBase64:', e);
+      return '';
     }
-    return window.btoa(binary);
   }
 
-  /**
-   * Safe Base64 to ArrayBuffer conversion
-   */
   base64ToArrayBuffer(base64) {
-    const binaryString = window.atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+    if (!base64) return new ArrayBuffer(0);
+    try {
+      const binaryString = window.atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    } catch (e) {
+      console.error('Error in base64ToArrayBuffer:', e);
+      return new ArrayBuffer(0);
     }
-    return bytes.buffer;
   }
 }
 
