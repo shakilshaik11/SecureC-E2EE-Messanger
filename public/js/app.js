@@ -635,6 +635,14 @@ document.addEventListener('DOMContentLoaded', () => {
       btnOpenPersistentRoom.disabled = false;
       btnOpenPersistentRoom.innerHTML = '<i class="fa-solid fa-folder-open"></i> <span>Open / Create Personal Room</span>';
     }
+    if (btnJoinPersistentRoom) {
+      btnJoinPersistentRoom.disabled = false;
+      btnJoinPersistentRoom.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> <span>Join Personal Room</span>';
+    }
+    if (btnOpenMydata) {
+      btnOpenMydata.disabled = false;
+      btnOpenMydata.innerHTML = '<i class="fa-solid fa-vault"></i> <span>Open / Unlock MyData Vault</span>';
+    }
 
     if (success && roomCode) {
       currentRoomCode = roomCode;
@@ -643,16 +651,37 @@ document.addEventListener('DOMContentLoaded', () => {
       const shareUrl = `${window.location.origin}/?room=${currentRoomCode}`;
       shareLinkInput.value = shareUrl;
 
-      if (isPersistent) {
+      if (isPersistent || roomCode.startsWith('MYDATA_')) {
         const keyToDerive = currentVaultPassphrase || localStorage.getItem('securec_vault_passphrase_' + roomCode) || roomCode;
         await window.e2ee.deriveKeyFromPassphrase(keyToDerive);
         isE2EEActive = true;
-        if (chatPeerStatus) {
-          chatPeerStatus.textContent = '🔒 Persistent E2EE Room';
-          chatPeerStatus.classList.add('text-success');
+        
+        if (roomCode.startsWith('MYDATA_')) {
+          const rawVaultName = roomCode.replace('MYDATA_', '');
+          if (chatPeerAvatar) chatPeerAvatar.textContent = '☁️';
+          if (chatPeerName) chatPeerName.textContent = `MyData Vault (${rawVaultName})`;
+          if (chatPeerStatus) {
+            chatPeerStatus.textContent = '🔒 Zero-Knowledge Cloud Vault · Private Storage';
+            chatPeerStatus.classList.add('text-success');
+          }
+          if (peerStatusDot) peerStatusDot.className = 'status-dot online';
+          const noticeEl = document.querySelector('.security-notice-bar span');
+          if (noticeEl) noticeEl.textContent = 'Zero-Knowledge Encrypted Cloud Vault · Passcode Protected';
+        } else {
+          if (chatPeerAvatar) chatPeerAvatar.textContent = '🔐';
+          if (chatPeerName) chatPeerName.textContent = `Personal Room (${roomCode})`;
+          if (chatPeerStatus) {
+            chatPeerStatus.textContent = '🔒 Persistent E2EE Room · Passcode Protected';
+            chatPeerStatus.classList.add('text-success');
+          }
+          if (peerStatusDot) peerStatusDot.className = 'status-dot online';
+          const noticeEl = document.querySelector('.security-notice-bar span');
+          if (noticeEl) noticeEl.textContent = 'Persistent E2EE Session · Chat History Saved Securely';
         }
+
         enterChatRoom();
         showToast(`Opened Personal Room: ${roomCode}`);
+        restorePersistentHistory(roomCode);
       } else {
         createdCodeBox.classList.remove('hidden');
         showToast('Ephemeral Room Created Successfully!');
@@ -671,31 +700,46 @@ document.addEventListener('DOMContentLoaded', () => {
       btnJoinPersistentRoom.disabled = false;
       btnJoinPersistentRoom.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> <span>Join Personal Room</span>';
     }
+    if (btnOpenPersistentRoom) {
+      btnOpenPersistentRoom.disabled = false;
+      btnOpenPersistentRoom.innerHTML = '<i class="fa-solid fa-folder-open"></i> <span>Open / Create Personal Room</span>';
+    }
+    if (btnOpenMydata) {
+      btnOpenMydata.disabled = false;
+      btnOpenMydata.innerHTML = '<i class="fa-solid fa-vault"></i> <span>Open / Unlock MyData Vault</span>';
+    }
 
     if (success && roomCode) {
       currentRoomCode = roomCode;
-      if (isPersistent) {
+      if (isPersistent || roomCode.startsWith('MYDATA_')) {
         const keyToDerive = currentVaultPassphrase || localStorage.getItem('securec_vault_passphrase_' + roomCode) || roomCode;
         await window.e2ee.deriveKeyFromPassphrase(keyToDerive);
         isE2EEActive = true;
         
         if (roomCode.startsWith('MYDATA_')) {
+          const rawVaultName = roomCode.replace('MYDATA_', '');
           if (chatPeerAvatar) chatPeerAvatar.textContent = '☁️';
-          if (chatPeerName) chatPeerName.textContent = 'MyData Vault';
+          if (chatPeerName) chatPeerName.textContent = `MyData Vault (${rawVaultName})`;
           if (chatPeerStatus) {
-            chatPeerStatus.textContent = '🔒 Personal E2EE Cloud Vault';
+            chatPeerStatus.textContent = '🔒 Zero-Knowledge Cloud Vault · Private Storage';
             chatPeerStatus.classList.add('text-success');
           }
           if (peerStatusDot) peerStatusDot.className = 'status-dot online';
+          const noticeEl = document.querySelector('.security-notice-bar span');
+          if (noticeEl) noticeEl.textContent = 'Zero-Knowledge Encrypted Cloud Vault · Passcode Protected';
         } else {
           if (chatPeerAvatar) chatPeerAvatar.textContent = '🔐';
-          if (chatPeerName) chatPeerName.textContent = 'Personal Room';
+          if (chatPeerName) chatPeerName.textContent = `Personal Room (${roomCode})`;
           if (chatPeerStatus) {
             chatPeerStatus.textContent = '🔒 Persistent E2EE Session Active';
             chatPeerStatus.classList.add('text-success');
           }
           if (peerStatusDot) peerStatusDot.className = 'status-dot online';
+          const noticeEl = document.querySelector('.security-notice-bar span');
+          if (noticeEl) noticeEl.textContent = 'Persistent E2EE Session · Chat History Saved Securely';
         }
+
+        restorePersistentHistory(roomCode);
       }
 
       if (members && members.length > 0) {
@@ -703,7 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const peer = members.find(m => m.userId !== currentId);
         if (peer) {
           setupPeerInfo(peer);
-          if (peer.publicKey && !isPersistent) {
+          if (peer.publicKey && !isPersistent && !roomCode.startsWith('MYDATA_')) {
             try {
               await window.e2ee.deriveSharedSecret(peer.publicKey);
               isE2EEActive = true;
@@ -733,7 +777,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const itemId = item.id || (item.encryptedPayload && item.encryptedPayload.id);
       if (!list.some(m => (m.id === itemId || (m.encryptedPayload && m.encryptedPayload.id === itemId)))) {
         list.push(item);
-        if (list.length > 300) list = list.slice(list.length - 300);
+        if (list.length > 500) list = list.slice(list.length - 500);
         localStorage.setItem(storageKey, JSON.stringify(list));
       }
     } catch (e) {
@@ -752,38 +796,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Server WebSocket Event: Receive Saved Room History
-  socket.on('room-history', async ({ roomCode, history }) => {
-    const code = roomCode || currentRoomCode;
-    let historyList = (history && Array.isArray(history) && history.length > 0) ? history : getLocalMessageHistory(code);
+  // Restore persistent history helper
+  async function restorePersistentHistory(roomCode) {
+    const code = (roomCode || currentRoomCode)?.toUpperCase();
+    if (!code) return;
 
+    const historyList = getLocalMessageHistory(code);
     if (!historyList || historyList.length === 0) return;
 
-    // Derive room encryption key if not derived yet
     const keyToDerive = currentVaultPassphrase || localStorage.getItem('securec_vault_passphrase_' + code) || code;
     if (keyToDerive) {
       await window.e2ee.deriveKeyFromPassphrase(keyToDerive);
     }
 
-    showToast('📜 Restoring E2EE chat history...');
-
-    // Clear previous feed content (welcome pills/placeholders)
-    if (chatFeed) {
-      chatFeed.innerHTML = `
-        <div class="system-message">
-          <div class="system-pill">
-            <i class="fa-solid fa-lock text-emerald"></i>
-            <span>Persistent E2EE Session — Decrypted Chat History Restored</span>
-          </div>
-        </div>
-      `;
-    }
-
     for (const item of historyList) {
       try {
-        saveLocalMessageHistory(code, item);
-
         const encryptedPayload = item.encryptedPayload || item;
+        const msgId = encryptedPayload.id || item.id || ('msg_' + Date.now());
+
+        if (document.getElementById(`msg-${msgId}`)) continue;
+
         const payloadObj = encryptedPayload.payload || encryptedPayload;
         const isBinary = !!(encryptedPayload.isBinary || payloadObj.isBinary);
 
@@ -816,7 +848,82 @@ document.addEventListener('DOMContentLoaded', () => {
         const senderName = isOwn ? (currentUser.username || storedName || 'Me') : (itemSenderName || (peerUser ? peerUser.username : 'Participant'));
 
         appendMessageToFeed({
-          id: encryptedPayload.id || item.id || ('msg_' + Date.now()),
+          id: msgId,
+          sender: senderName,
+          isOwn: isOwn,
+          content: content,
+          mediaType: mediaType,
+          fileName: meta.fileName,
+          fileSize: meta.fileSize,
+          replyTo: encryptedPayload.replyTo || null,
+          createdTime: item.timestamp ? new Date(item.timestamp).getTime() : Date.now(),
+          timestamp: new Date(item.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+      } catch (err) {
+        console.warn('History decryption notice for local item:', err);
+      }
+    }
+  }
+
+  // Server WebSocket Event: Receive Saved Room History
+  socket.on('room-history', async ({ roomCode, history }) => {
+    const code = (roomCode || currentRoomCode)?.toUpperCase();
+    if (!code) return;
+
+    let historyList = (history && Array.isArray(history) && history.length > 0) ? history : getLocalMessageHistory(code);
+
+    if (!historyList || historyList.length === 0) return;
+
+    // Derive room encryption key if not derived yet
+    const keyToDerive = currentVaultPassphrase || localStorage.getItem('securec_vault_passphrase_' + code) || code;
+    if (keyToDerive) {
+      await window.e2ee.deriveKeyFromPassphrase(keyToDerive);
+    }
+
+    showToast('📜 Restoring E2EE chat history...');
+
+    for (const item of historyList) {
+      try {
+        saveLocalMessageHistory(code, item);
+
+        const encryptedPayload = item.encryptedPayload || item;
+        const msgId = encryptedPayload.id || item.id || ('msg_' + Date.now());
+
+        if (document.getElementById(`msg-${msgId}`)) continue;
+
+        const payloadObj = encryptedPayload.payload || encryptedPayload;
+        const isBinary = !!(encryptedPayload.isBinary || payloadObj.isBinary);
+
+        const decryptedData = await window.e2ee.decrypt(payloadObj, isBinary);
+        let content = decryptedData;
+        let mediaType = encryptedPayload.mediaType || 'text';
+        let meta = encryptedPayload.meta || item.meta || (payloadObj && payloadObj.meta) || {};
+
+        if (isBinary) {
+          const base64Data = window.e2ee.arrayBufferToBase64(decryptedData);
+          const mime = meta.mimeType || (mediaType === 'image' ? 'image/png' : (mediaType === 'voice' ? 'audio/webm' : 'application/octet-stream'));
+          content = `data:${mime};base64,${base64Data}`;
+        }
+
+        const itemSenderId = item.senderUserId || (encryptedPayload && encryptedPayload.senderUserId);
+        const itemSenderName = item.senderUsername || (encryptedPayload && encryptedPayload.senderUsername);
+        const storedUid = localStorage.getItem('securec_user_uid');
+        const storedName = localStorage.getItem('securec_username');
+
+        let isOwn = false;
+        if (itemSenderId && (itemSenderId === currentUser.uid || itemSenderId === storedUid)) {
+          isOwn = true;
+        } else if (itemSenderName) {
+          const sName = String(itemSenderName).toLowerCase();
+          if ((currentUser.username && sName === currentUser.username.toLowerCase()) || (storedName && sName === storedName.toLowerCase())) {
+            isOwn = true;
+          }
+        }
+
+        const senderName = isOwn ? (currentUser.username || storedName || 'Me') : (itemSenderName || (peerUser ? peerUser.username : 'Participant'));
+
+        appendMessageToFeed({
+          id: msgId,
           sender: senderName,
           isOwn: isOwn,
           content: content,
@@ -837,6 +944,18 @@ document.addEventListener('DOMContentLoaded', () => {
   socket.on('join-failed', ({ message }) => {
     btnJoinRoom.disabled = false;
     btnJoinRoom.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> <span>Join Room</span>';
+    if (btnJoinPersistentRoom) {
+      btnJoinPersistentRoom.disabled = false;
+      btnJoinPersistentRoom.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> <span>Join Personal Room</span>';
+    }
+    if (btnOpenPersistentRoom) {
+      btnOpenPersistentRoom.disabled = false;
+      btnOpenPersistentRoom.innerHTML = '<i class="fa-solid fa-folder-open"></i> <span>Open / Create Personal Room</span>';
+    }
+    if (btnOpenMydata) {
+      btnOpenMydata.disabled = false;
+      btnOpenMydata.innerHTML = '<i class="fa-solid fa-vault"></i> <span>Open / Unlock MyData Vault</span>';
+    }
     alert(message || 'Failed to join room. Please check the code.');
   });
 
@@ -922,19 +1041,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Open / Create Persistent Personal Room Click Handler
   if (btnOpenPersistentRoom) {
-    btnOpenPersistentRoom.addEventListener('click', () => {
+    btnOpenPersistentRoom.addEventListener('click', async () => {
       const customCode = persistentKeyInput ? persistentKeyInput.value.trim() : '';
       if (!customCode || customCode.length < 3) {
         alert('Please enter a custom room key or passcode (at least 3 characters)');
+        if (persistentKeyInput) persistentKeyInput.focus();
         return;
       }
 
       btnOpenPersistentRoom.disabled = true;
       btnOpenPersistentRoom.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Opening...';
 
-      if (!window.e2ee.keyPair) {
-        window.e2ee.generateKeyPair().catch(err => console.error('E2EE KeyGen:', err));
-      }
+      const upperCode = customCode.toUpperCase();
+      currentVaultPassphrase = upperCode;
+      localStorage.setItem('securec_vault_passphrase_' + upperCode, upperCode);
+      await window.e2ee.deriveKeyFromPassphrase(upperCode);
+      isE2EEActive = true;
 
       const userId = currentUser.uid || 'user_' + Math.random().toString(36).substring(2, 9);
       currentUser.uid = userId;
@@ -944,37 +1066,56 @@ document.addEventListener('DOMContentLoaded', () => {
         username: currentUser.username,
         avatar: currentUser.avatar,
         isPersistent: true,
-        customCode: customCode
+        customCode: upperCode
       });
+
+      // Safety timeout in case of network issue
+      setTimeout(() => {
+        if (btnOpenPersistentRoom && btnOpenPersistentRoom.disabled) {
+          btnOpenPersistentRoom.disabled = false;
+          btnOpenPersistentRoom.innerHTML = '<i class="fa-solid fa-folder-open"></i> <span>Open / Create Personal Room</span>';
+        }
+      }, 8000);
     });
   }
 
   // Join Persistent Personal Room Click Handler
   if (btnJoinPersistentRoom) {
-    btnJoinPersistentRoom.addEventListener('click', () => {
+    btnJoinPersistentRoom.addEventListener('click', async () => {
       const customCode = persistentKeyInput ? persistentKeyInput.value.trim() : '';
       if (!customCode || customCode.length < 3) {
         alert('Please enter a custom room key or passcode (at least 3 characters)');
+        if (persistentKeyInput) persistentKeyInput.focus();
         return;
       }
 
       btnJoinPersistentRoom.disabled = true;
       btnJoinPersistentRoom.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Joining...';
 
-      if (!window.e2ee.keyPair) {
-        window.e2ee.generateKeyPair().catch(err => console.error('E2EE KeyGen:', err));
-      }
+      const upperCode = customCode.toUpperCase();
+      currentVaultPassphrase = upperCode;
+      localStorage.setItem('securec_vault_passphrase_' + upperCode, upperCode);
+      await window.e2ee.deriveKeyFromPassphrase(upperCode);
+      isE2EEActive = true;
 
       const userId = currentUser.uid || 'user_' + Math.random().toString(36).substring(2, 9);
       currentUser.uid = userId;
 
       socket.emit('join-room', {
-        roomCode: customCode,
+        roomCode: upperCode,
         userId,
         username: currentUser.username,
         avatar: currentUser.avatar,
         isPersistent: true
       });
+
+      // Safety timeout in case of network issue
+      setTimeout(() => {
+        if (btnJoinPersistentRoom && btnJoinPersistentRoom.disabled) {
+          btnJoinPersistentRoom.disabled = false;
+          btnJoinPersistentRoom.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> <span>Join Personal Room</span>';
+        }
+      }, 8000);
     });
   }
 
@@ -1005,7 +1146,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const masterPasscode = mydataPasscodeInput ? mydataPasscodeInput.value.trim() : '';
 
       if (!vaultId || vaultId.length < 3) {
-        alert('Please enter a Unique Vault ID (at least 3 characters, e.g. shakil_vault_2026)');
+        alert('Please enter a Unique Vault Name (at least 3 characters, e.g. MyPersonalVault)');
         if (mydataVaultIdInput) mydataVaultIdInput.focus();
         return;
       }
@@ -1042,6 +1183,14 @@ document.addEventListener('DOMContentLoaded', () => {
         avatar: currentUser.avatar,
         isPersistent: true
       });
+
+      // Safety timeout in case of network issue
+      setTimeout(() => {
+        if (btnOpenMydata && btnOpenMydata.disabled) {
+          btnOpenMydata.disabled = false;
+          btnOpenMydata.innerHTML = '<i class="fa-solid fa-vault"></i> <span>Open / Unlock MyData Vault</span>';
+        }
+      }, 8000);
     });
   }
 
@@ -1077,7 +1226,8 @@ document.addEventListener('DOMContentLoaded', () => {
       enterChatRoom();
     }
 
-    if (user.publicKey) {
+    const isPersistentRoom = (currentRoomCode && (currentRoomCode.startsWith('MYDATA_') || !!currentVaultPassphrase || !!localStorage.getItem('securec_vault_passphrase_' + currentRoomCode)));
+    if (user.publicKey && !isPersistentRoom) {
       try {
         await window.e2ee.deriveSharedSecret(user.publicKey);
         isE2EEActive = true;
@@ -1098,7 +1248,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     showSystemNotification(`${user.username || 'Peer'} reconnected.`);
 
-    if (user.publicKey) {
+    const isPersistentRoom = (currentRoomCode && (currentRoomCode.startsWith('MYDATA_') || !!currentVaultPassphrase || !!localStorage.getItem('securec_vault_passphrase_' + currentRoomCode)));
+    if (user.publicKey && !isPersistentRoom) {
       try {
         await window.e2ee.deriveSharedSecret(user.publicKey);
         isE2EEActive = true;
@@ -1130,6 +1281,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Socket Event: Peer Public Key Received -> Complete ECDH Derivation
   socket.on('peer-public-key', async (data) => {
+    const isPersistentRoom = (currentRoomCode && (currentRoomCode.startsWith('MYDATA_') || !!currentVaultPassphrase || !!localStorage.getItem('securec_vault_passphrase_' + currentRoomCode)));
+    if (isPersistentRoom) return;
+
     const publicKey = data ? (data.publicKey || data) : null;
     if (!publicKey) return;
 
@@ -1336,12 +1490,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (stepAuth) stepAuth.classList.add('hidden');
     if (stepChat) stepChat.classList.remove('hidden');
 
-    await ensureE2EEActive();
+    const isPersistentRoom = (currentRoomCode && (currentRoomCode.startsWith('MYDATA_') || !!currentVaultPassphrase || !!localStorage.getItem('securec_vault_passphrase_' + currentRoomCode)));
+
+    if (!isPersistentRoom) {
+      await ensureE2EEActive();
+    } else {
+      isE2EEActive = true;
+      const keyToDerive = currentVaultPassphrase || localStorage.getItem('securec_vault_passphrase_' + currentRoomCode) || currentRoomCode;
+      await window.e2ee.deriveKeyFromPassphrase(keyToDerive);
+    }
 
     // Proactively request microphone permission upon entering chat
     requestMicrophonePermissionProactively();
 
-    showSystemNotification(`Joined room ${currentRoomCode || ''}. All messages are private & encrypted.`);
+    showSystemNotification(`Entered room ${currentRoomCode || ''}. All messages are private & encrypted.`);
   }
 
   // Global State for Rich Messaging Features
@@ -1526,7 +1688,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.filter(e => e !== '+' && e !== '➕' && e !== 'add');
         }
       }
     } catch (e) {
@@ -1586,9 +1748,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return `
       <div class="reactions-toolbar" id="reactions-toolbar-${messageId}">
         ${emojiBtnsHtml}
-        <button class="reaction-add-btn" title="More Emojis (+)" onclick="openEmojiPickerModal('${messageId}', event)">
-          <i class="fa-solid fa-plus"></i>
-        </button>
         <button class="reaction-action-icon" title="Reply" onclick="triggerReplyMessage('${messageId}')">
           <i class="fa-solid fa-reply"></i>
         </button>
@@ -1902,6 +2061,14 @@ document.addEventListener('DOMContentLoaded', () => {
           roomCode: currentRoomCode,
           userId: currentUser.uid,
           encryptedPayload: payload
+        });
+
+        saveLocalMessageHistory(currentRoomCode, {
+          id: messageId,
+          senderUserId: currentUser.uid,
+          senderUsername: currentUser.username,
+          encryptedPayload: payload,
+          timestamp: new Date().toISOString()
         });
 
         const base64Data = window.e2ee.arrayBufferToBase64(arrayBuffer);
@@ -2265,6 +2432,14 @@ document.addEventListener('DOMContentLoaded', () => {
           encryptedPayload: payload
         });
 
+        saveLocalMessageHistory(currentRoomCode, {
+          id: messageId,
+          senderUserId: currentUser.uid,
+          senderUsername: currentUser.username,
+          encryptedPayload: payload,
+          timestamp: new Date().toISOString()
+        });
+
         appendMessageToFeed({
           id: messageId,
           sender: currentUser.username,
@@ -2486,6 +2661,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function appendMessageToFeed({ id, sender, isOwn, content, mediaType, fileName, fileSize, replyTo, createdTime, timestamp }) {
+    if (id && document.getElementById('msg-' + id)) return;
     createdTime = createdTime || Date.now();
     const msgObj = {
       id,
@@ -2590,10 +2766,13 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
+    const isPersonalOrVault = !!(currentRoomCode && (currentRoomCode.startsWith('MYDATA_') || currentRoomCode.startsWith('PER_')));
+    const senderNameHtml = (!isPersonalOrVault && !isOwn) ? `<div class="message-sender-name">${escapeHtml(sender)}</div>` : '';
+
     row.innerHTML = `
       <div class="message-bubble-wrapper">
         ${reactionsToolbarHtml}
-        <div class="message-sender-name">${escapeHtml(sender)}</div>
+        ${senderNameHtml}
         <div class="message-bubble ${isOwn ? 'own' : 'peer'}">
           ${chevronMenuHtml}
           ${replyBoxHtml}
@@ -2608,6 +2787,37 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     `;
+
+    // WhatsApp-Style Long Press (450ms) / Context Menu for Emoji Reactions
+    let longPressTimer = null;
+    const bubbleWrapper = row.querySelector('.message-bubble-wrapper');
+    if (bubbleWrapper) {
+      const startPress = (e) => {
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+        longPressTimer = setTimeout(() => {
+          if (navigator.vibrate) navigator.vibrate(40);
+          toggleReactionToolbar(id);
+        }, 2000);
+      };
+
+      const cancelPress = () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      };
+
+      bubbleWrapper.addEventListener('touchstart', startPress, { passive: true });
+      bubbleWrapper.addEventListener('touchend', cancelPress);
+      bubbleWrapper.addEventListener('touchmove', cancelPress);
+      bubbleWrapper.addEventListener('mousedown', startPress);
+      bubbleWrapper.addEventListener('mouseup', cancelPress);
+      bubbleWrapper.addEventListener('mouseleave', cancelPress);
+      bubbleWrapper.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        toggleReactionToolbar(id);
+      });
+    }
 
     chatFeed.appendChild(row);
     chatFeed.scrollTop = chatFeed.scrollHeight;

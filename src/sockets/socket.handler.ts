@@ -21,16 +21,17 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
         case 'create-room': {
           const { userId, username, avatar, maxParticipants, isPersistent, customCode } = payload;
           currentUserId = userId;
-          const code = (isPersistent && customCode) ? customCode.trim().toUpperCase() : CryptoService.generateRandomCode(6);
+          const isPersistentRoom = !!isPersistent || (customCode && customCode.trim().toUpperCase().startsWith('MYDATA_'));
+          const code = (isPersistentRoom && customCode) ? customCode.trim().toUpperCase() : CryptoService.generateRandomCode(6);
 
-          roomManager.createRoom(code, userId, maxParticipants || 50, !!isPersistent);
+          roomManager.createRoom(code, userId, maxParticipants || 50, isPersistentRoom);
           roomManager.joinRoom(code, {
             socket: ws,
             userId,
             username: username || 'User 1',
             avatar: avatar || '🧑‍💻',
             joinedAt: new Date()
-          }, !!isPersistent);
+          }, isPersistentRoom);
 
           currentRoomCode = code;
 
@@ -39,19 +40,19 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
               action: 'room-created',
               success: true,
               roomCode: code,
-              isPersistent: !!isPersistent,
+              isPersistent: isPersistentRoom,
               maxParticipants: maxParticipants || 50
             })
           );
 
-          // Send room history if persistent room has saved messages (fetched from memory or DB)
-          const history = await roomManager.getRoomHistoryAsync(code);
-          if (history && history.length > 0) {
+          // Send room history if persistent room (even if empty, so client knows it is ready)
+          if (isPersistentRoom) {
+            const history = await roomManager.getRoomHistoryAsync(code);
             ws.send(
               JSON.stringify({
                 action: 'room-history',
                 roomCode: code,
-                history
+                history: history || []
               })
             );
           }
@@ -61,15 +62,17 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
         case 'join-room': {
           const { roomCode, userId, username, avatar, isPersistent, publicKey } = payload;
           currentUserId = userId;
+          const targetRoomCode = (roomCode || '').trim().toUpperCase();
+          const shouldBePersistent = !!isPersistent || targetRoomCode.startsWith('MYDATA_');
 
-          const result = roomManager.joinRoom(roomCode, {
+          const result = roomManager.joinRoom(targetRoomCode, {
             socket: ws,
             userId,
             username: username || 'User 2',
             avatar: avatar || '⚡',
             publicKey: publicKey,
             joinedAt: new Date()
-          }, !!isPersistent);
+          }, shouldBePersistent);
 
           if (!result.success || !result.room) {
             ws.send(
@@ -83,6 +86,7 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
           }
 
           currentRoomCode = result.room.code;
+          const isFinalPersistent = !!result.room.isPersistent || currentRoomCode.startsWith('MYDATA_');
 
           // Notify joining user of success and active member list
           ws.send(
@@ -90,7 +94,7 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
               action: 'room-joined',
               success: true,
               roomCode: currentRoomCode,
-              isPersistent: !!result.room.isPersistent,
+              isPersistent: isFinalPersistent,
               maxParticipants: result.room.maxParticipants,
               members: Array.from(result.room.participants.values()).map((p) => ({
                 userId: p.userId,
@@ -103,13 +107,13 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
           );
 
           // If room has persistent history, send previous encrypted chat history to joining user
-          const history = await roomManager.getRoomHistoryAsync(currentRoomCode);
-          if (history && history.length > 0) {
+          if (isFinalPersistent) {
+            const history = await roomManager.getRoomHistoryAsync(currentRoomCode);
             ws.send(
               JSON.stringify({
                 action: 'room-history',
                 roomCode: currentRoomCode,
-                history
+                history: history || []
               })
             );
           }
@@ -128,12 +132,13 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
         }
 
         case 'rejoin-room': {
-          const { roomCode, userId, username, avatar, publicKey } = payload;
+          const { roomCode, userId, username, avatar, publicKey, isPersistent } = payload;
           if (!roomCode || !userId) return;
 
           const targetRoomCode = roomCode.toUpperCase();
           currentUserId = userId;
           currentRoomCode = targetRoomCode;
+          const shouldBePersistent = !!isPersistent || targetRoomCode.startsWith('MYDATA_') || !!roomManager.getRoom(targetRoomCode)?.isPersistent;
 
           const result = roomManager.rejoinRoom(targetRoomCode, {
             socket: ws,
@@ -142,15 +147,16 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
             avatar: avatar || '🧑‍💻',
             publicKey: publicKey,
             joinedAt: new Date()
-          });
+          }, shouldBePersistent);
 
           if (result.success && result.room) {
+            const isFinalPersistent = !!result.room.isPersistent || targetRoomCode.startsWith('MYDATA_');
             ws.send(
               JSON.stringify({
                 action: 'room-joined',
                 success: true,
                 roomCode: targetRoomCode,
-                isPersistent: !!result.room.isPersistent,
+                isPersistent: isFinalPersistent,
                 isRejoin: true,
                 maxParticipants: result.room.maxParticipants,
                 members: Array.from(result.room.participants.values()).map((p) => ({
@@ -162,6 +168,17 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
                 }))
               })
             );
+
+            if (isFinalPersistent) {
+              const history = await roomManager.getRoomHistoryAsync(targetRoomCode);
+              ws.send(
+                JSON.stringify({
+                  action: 'room-history',
+                  roomCode: targetRoomCode,
+                  history: history || []
+                })
+              );
+            }
 
             // Broadcast to room members that user reconnected
             roomManager.broadcastToRoom(targetRoomCode, userId, {

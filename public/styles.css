@@ -3737,22 +3737,44 @@ body::before {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+#btn-leave-room {
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.room-code-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 140px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @media (max-width: 576px) {
   .chat-header {
     padding: 8px 10px;
+    gap: 4px;
+  }
+  .room-code-badge #btn-copy-chat-code {
+    display: none;
   }
   .room-code-badge {
-    max-width: 95px;
-    font-size: 0.72rem;
-    padding: 4px 8px;
+    max-width: 80px;
+    font-size: 0.7rem;
+    padding: 3px 6px;
   }
   .theme-switch-chat {
-    transform: scale(0.85);
+    transform: scale(0.8);
   }
   .file-attachment-card {
     padding: 10px 12px;
     gap: 10px;
   }
+}
+
+.reaction-add-btn {
+  display: none !important;
 }

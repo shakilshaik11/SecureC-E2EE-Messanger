@@ -142,9 +142,12 @@ export class RoomManager {
    */
   public rejoinRoom(
     code: string,
-    participant: RoomParticipant
+    participant: RoomParticipant,
+    isPersistent = false
   ): { success: boolean; message?: string; room?: ActiveRoom } {
-    return this.joinRoom(code, participant, false);
+    const existing = this.rooms.get(code.toUpperCase());
+    const persistentFlag = isPersistent || !!existing?.isPersistent || code.toUpperCase().startsWith('MYDATA_');
+    return this.joinRoom(code, participant, persistentFlag);
   }
 
   /**
@@ -213,8 +216,15 @@ export class RoomManager {
    */
   public addMessageToHistory(roomCode: string, entry: any): void {
     const code = roomCode.toUpperCase();
-    const room = this.rooms.get(code);
-    if (room && room.isPersistent) {
+    let room = this.rooms.get(code);
+    const isPersistent = (room && room.isPersistent) || code.startsWith('MYDATA_');
+
+    if (isPersistent) {
+      if (!room) {
+        room = this.createRoom(code, entry.senderUserId, 50, true);
+      } else {
+        room.isPersistent = true;
+      }
       if (!room.encryptedHistory) room.encryptedHistory = [];
       room.encryptedHistory.push(entry);
     }
