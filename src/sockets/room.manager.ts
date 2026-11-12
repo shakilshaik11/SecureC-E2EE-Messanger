@@ -91,14 +91,23 @@ export class RoomManager {
     isPersistent = false
   ): { success: boolean; message?: string; room?: ActiveRoom; isRejoin?: boolean } {
     const roomCode = code.toUpperCase();
+    const isPersistentFlag = isPersistent || roomCode.startsWith('MYDATA_');
+
+    const prevRoomCode = this.userToRoom.get(participant.userId);
+    if (prevRoomCode && prevRoomCode !== roomCode) {
+      this.leaveRoom(participant.userId, true);
+    }
+
     let room = this.rooms.get(roomCode);
 
     if (!room) {
-      if (isPersistent) {
+      if (isPersistentFlag) {
         room = this.createRoom(roomCode, participant.userId, 50, true);
       } else {
         return { success: false, message: 'Room code not found or expired.' };
       }
+    } else if (isPersistentFlag) {
+      room.isPersistent = true;
     }
 
     const existingParticipant = room.participants.get(participant.userId);

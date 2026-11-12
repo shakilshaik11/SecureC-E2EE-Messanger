@@ -555,7 +555,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const roomFromUrl = urlParams.get('room');
   if (roomFromUrl) {
-    joinCodeInput.value = roomFromUrl.toUpperCase();
+    const cleanRoom = roomFromUrl.trim().toUpperCase();
+    if (joinCodeInput) joinCodeInput.value = cleanRoom;
+    if (cleanRoom.startsWith('MYDATA_')) {
+      if (mydataVaultIdInput) mydataVaultIdInput.value = cleanRoom.replace('MYDATA_', '');
+    } else if (cleanRoom.length !== 6 && persistentKeyInput) {
+      persistentKeyInput.value = cleanRoom;
+    }
   }
 
   // Handle Avatar Selection
@@ -628,7 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================================
 
   // Server WebSocket Event: Room Created
-  socket.on('room-created', async ({ success, roomCode, isPersistent, message }) => {
+  socket.on('room-created', async ({ success, roomCode, isPersistent, message, members }) => {
     btnCreateRoom.disabled = false;
     btnCreateRoom.innerHTML = '<i class="fa-solid fa-key"></i> <span>Create Room Code</span>';
     if (btnOpenPersistentRoom) {
@@ -686,6 +692,21 @@ document.addEventListener('DOMContentLoaded', () => {
         createdCodeBox.classList.remove('hidden');
         showToast('Ephemeral Room Created Successfully!');
       }
+
+      if (members && members.length > 0 && !roomCode.startsWith('MYDATA_')) {
+        const currentId = currentUser.uid || currentUser.username;
+        const peer = members.find(m => m.userId !== currentId);
+        if (peer) {
+          setupPeerInfo(peer);
+          if (peer.publicKey && !isPersistent) {
+            try {
+              await window.e2ee.deriveSharedSecret(peer.publicKey);
+              isE2EEActive = true;
+            } catch (e) { }
+          }
+        }
+      }
+
       shareLocalPublicKey();
     } else if (message) {
       alert(message);
@@ -742,12 +763,12 @@ document.addEventListener('DOMContentLoaded', () => {
         restorePersistentHistory(roomCode);
       }
 
-      if (members && members.length > 0) {
+      if (members && members.length > 0 && !roomCode.startsWith('MYDATA_')) {
         const currentId = currentUser.uid || currentUser.username;
         const peer = members.find(m => m.userId !== currentId);
         if (peer) {
           setupPeerInfo(peer);
-          if (peer.publicKey && !isPersistent && !roomCode.startsWith('MYDATA_')) {
+          if (peer.publicKey && !isPersistent) {
             try {
               await window.e2ee.deriveSharedSecret(peer.publicKey);
               isE2EEActive = true;
@@ -1008,19 +1029,38 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Join Room Click Handler (Instant Join)
-  btnJoinRoom.addEventListener('click', () => {
+  btnJoinRoom.addEventListener('click', async () => {
     const code = joinCodeInput.value.trim().toUpperCase();
-    if (code.length !== 6) {
-      alert('Please enter a valid 6-character room code');
+    if (!code || code.length < 3) {
+      alert('Please enter a valid room code (at least 3 characters)');
+      return;
+    }
+
+    if (code.startsWith('MYDATA_')) {
+      const rawName = code.replace('MYDATA_', '');
+      if (mydataVaultIdInput) mydataVaultIdInput.value = rawName;
+      if (mydataPasscodeInput) {
+        mydataPasscodeInput.focus();
+        showToast('🔒 Please enter your Secret Master Password to unlock this Vault.');
+      }
       return;
     }
 
     btnJoinRoom.disabled = true;
     btnJoinRoom.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Joining...';
 
-    // Background key pair generation (non-blocking)
-    if (!window.e2ee.keyPair) {
-      window.e2ee.generateKeyPair().catch(err => console.error('E2EE KeyGen:', err));
+    const storedPassphrase = localStorage.getItem('securec_vault_passphrase_' + code);
+    const isPersistent = !!storedPassphrase || code.length !== 6;
+    if (isPersistent) {
+      currentVaultPassphrase = storedPassphrase || code;
+      localStorage.setItem('securec_vault_passphrase_' + code, currentVaultPassphrase);
+      await window.e2ee.deriveKeyFromPassphrase(currentVaultPassphrase);
+      isE2EEActive = true;
+    } else {
+      // Background key pair generation (non-blocking)
+      if (!window.e2ee.keyPair) {
+        window.e2ee.generateKeyPair().catch(err => console.error('E2EE KeyGen:', err));
+      }
     }
 
     const userId = currentUser.uid || 'user_' + Math.random().toString(36).substring(2, 9);
@@ -1030,13 +1070,20 @@ document.addEventListener('DOMContentLoaded', () => {
       roomCode: code,
       userId: userId,
       username: currentUser.username,
-      avatar: currentUser.avatar
+      avatar: currentUser.avatar,
+      isPersistent: isPersistent
     });
   });
 
-  // Auto uppercase code input
+  // Auto uppercase code input & Enter key submission
   joinCodeInput.addEventListener('input', (e) => {
     e.target.value = e.target.value.toUpperCase();
+  });
+  joinCodeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      btnJoinRoom.click();
+    }
   });
 
   // Open / Create Persistent Personal Room Click Handler
@@ -1119,12 +1166,43 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Persistent key input keyboard navigation & uppercasing
+  if (persistentKeyInput) {
+    persistentKeyInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+    persistentKeyInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (btnOpenPersistentRoom) btnOpenPersistentRoom.click();
+      }
+    });
+  }
+
   // MyData Cloud Vault Elements & Click Handlers
   const btnHomeMyData = document.getElementById('btn-home-mydata');
   const mydataVaultIdInput = document.getElementById('mydata-vault-id-input');
   const mydataPasscodeInput = document.getElementById('mydata-passcode-input');
   const btnOpenMydata = document.getElementById('btn-open-mydata');
   const navBtnMydata = document.getElementById('nav-btn-mydata');
+
+  if (mydataVaultIdInput) {
+    mydataVaultIdInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (mydataPasscodeInput) mydataPasscodeInput.focus();
+      }
+    });
+  }
+
+  if (mydataPasscodeInput) {
+    mydataPasscodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (btnOpenMydata) btnOpenMydata.click();
+      }
+    });
+  }
 
   if (btnHomeMyData) {
     btnHomeMyData.addEventListener('click', () => {
@@ -1348,7 +1426,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const encryptedPayload = data.encryptedPayload || data;
       const payloadObj = encryptedPayload.payload || encryptedPayload;
-      const senderName = peerUser ? peerUser.username : 'Peer';
+      const senderName = (encryptedPayload && (encryptedPayload.senderUsername || encryptedPayload.sender)) || (data && (data.senderUsername || data.sender)) || (peerUser ? peerUser.username : 'Peer');
       const isBinary = !!(encryptedPayload.isBinary || payloadObj.isBinary);
 
       // Decrypt client-side using shared key
@@ -1457,6 +1535,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Helper to guarantee active E2EE key without blocking user
   async function ensureE2EEActive() {
+    const isPersistentRoom = !!(currentRoomCode && (currentRoomCode.startsWith('MYDATA_') || !!currentVaultPassphrase || !!localStorage.getItem('securec_vault_passphrase_' + currentRoomCode)));
+
+    if (isPersistentRoom) {
+      if (!isE2EEActive || !window.e2ee || !window.e2ee.sharedAESKey) {
+        const keyToDerive = currentVaultPassphrase || localStorage.getItem('securec_vault_passphrase_' + currentRoomCode) || currentRoomCode;
+        await window.e2ee.deriveKeyFromPassphrase(keyToDerive);
+        isE2EEActive = true;
+      }
+      return true;
+    }
+
     if (isE2EEActive && window.e2ee && window.e2ee.sharedAESKey) {
       return true;
     }
@@ -1483,6 +1572,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Enter Chat Room View & Initialize E2EE
   async function enterChatRoom() {
     if (chatRoomCodeText) chatRoomCodeText.textContent = currentRoomCode || '------';
+    const appWrapper = document.getElementById('app-root');
+    if (appWrapper) appWrapper.classList.add('in-chat');
 
     // Switch screens to Chat UI
     if (stepPortal) stepPortal.classList.add('hidden');
@@ -2766,7 +2857,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
-    const isPersonalOrVault = !!(currentRoomCode && (currentRoomCode.startsWith('MYDATA_') || currentRoomCode.startsWith('PER_')));
+    const isPersonalOrVault = !!(currentRoomCode && (currentRoomCode.startsWith('MYDATA_') || !!currentVaultPassphrase || !!localStorage.getItem('securec_vault_passphrase_' + currentRoomCode)));
     const senderNameHtml = (!isPersonalOrVault && !isOwn) ? `<div class="message-sender-name">${escapeHtml(sender)}</div>` : '';
 
     row.innerHTML = `
@@ -2907,16 +2998,17 @@ document.addEventListener('DOMContentLoaded', () => {
     peerStatusDot.className = 'status-dot online';
   }
 
-  function enterChatRoom() {
-    chatRoomCodeText.textContent = currentRoomCode;
-    const appWrapper = document.getElementById('app-root');
-    if (appWrapper) appWrapper.classList.add('in-chat');
-    switchScreen(stepPortal, stepChat);
+  function showScreen(toEl) {
+    const screens = [stepAuth, stepProfile, stepPortal, stepChat];
+    screens.forEach(s => {
+      if (s && s !== toEl) s.classList.add('hidden');
+    });
+    if (toEl) toEl.classList.remove('hidden');
   }
 
   function switchScreen(fromEl, toEl) {
-    fromEl.classList.add('hidden');
-    toEl.classList.remove('hidden');
+    if (fromEl) fromEl.classList.add('hidden');
+    if (toEl) toEl.classList.remove('hidden');
   }
 
   // Verification Modal Handlers (guarded if element exists)

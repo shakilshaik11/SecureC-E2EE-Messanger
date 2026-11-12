@@ -19,7 +19,7 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
           break;
 
         case 'create-room': {
-          const { userId, username, avatar, maxParticipants, isPersistent, customCode } = payload;
+          const { userId, username, avatar, maxParticipants, isPersistent, customCode, publicKey } = payload;
           currentUserId = userId;
           const isPersistentRoom = !!isPersistent || (customCode && customCode.trim().toUpperCase().startsWith('MYDATA_'));
           const code = (isPersistentRoom && customCode) ? customCode.trim().toUpperCase() : CryptoService.generateRandomCode(6);
@@ -30,10 +30,22 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
             userId,
             username: username || 'User 1',
             avatar: avatar || '🧑‍💻',
+            publicKey: publicKey,
             joinedAt: new Date()
           }, isPersistentRoom);
 
           currentRoomCode = code;
+
+          const activeRoom = roomManager.getRoom(code);
+          const membersList = activeRoom
+            ? Array.from(activeRoom.participants.values()).map((p) => ({
+                userId: p.userId,
+                username: p.username,
+                avatar: p.avatar,
+                publicKey: p.publicKey,
+                isOnline: p.isOnline
+              }))
+            : [];
 
           ws.send(
             JSON.stringify({
@@ -41,7 +53,8 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
               success: true,
               roomCode: code,
               isPersistent: isPersistentRoom,
-              maxParticipants: maxParticipants || 50
+              maxParticipants: maxParticipants || 50,
+              members: membersList
             })
           );
 
@@ -56,6 +69,17 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
               })
             );
           }
+
+          // Broadcast to existing room members if any
+          roomManager.broadcastToRoom(code, userId, {
+            action: 'user-joined',
+            user: {
+              userId,
+              username: username || 'User 1',
+              avatar: avatar || '🧑‍💻',
+              publicKey: publicKey
+            }
+          });
           break;
         }
 
@@ -327,6 +351,22 @@ export const handleWebSocketConnection = (ws: WebSocket): void => {
             messageId: payload.messageId,
             status: payload.status // 'delivered' | 'read'
           });
+          break;
+        }
+
+        case 'leave-room': {
+          if (currentUserId) {
+            const { roomCode } = roomManager.leaveRoom(currentUserId, true);
+            if (roomCode) {
+              roomManager.broadcastToRoom(roomCode, currentUserId, {
+                action: 'user-status-changed',
+                userId: currentUserId,
+                isOnline: false,
+                isTemporary: false
+              });
+            }
+            currentRoomCode = null;
+          }
           break;
         }
 
